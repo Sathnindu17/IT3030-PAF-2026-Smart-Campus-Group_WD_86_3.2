@@ -1,0 +1,23 @@
+server:
+  port: 8088
+
+spring:
+  data:
+    mongodb:
+      # We removed the ${MONGODB_URI:} wrapper to ensure it uses this exact string
+      uri: mongodb+srv://sathnidu:Pass1234@cluster0.87biawa.mongodb.net/smart_campus?authSource=admin&retryWrites=true&w=majority
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 15MB
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:default-dev-secret-key-change-in-production-must-be-long-enough}
+    expiration-ms: 86400000
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+  upload:
+    dir: ${UPLOAD_DIR:uploads}

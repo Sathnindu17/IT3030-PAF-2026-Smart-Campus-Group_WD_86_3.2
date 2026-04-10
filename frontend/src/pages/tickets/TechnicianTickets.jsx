@@ -5,6 +5,9 @@ import { ticketsAPI } from '../../api/axios';
 export default function TechnicianTickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [feedback, setFeedback] = useState({ type: '', message: '' });
   const [statusModal, setStatusModal] = useState({ open: false, ticketId: null, status: '' });
   const [resolveModal, setResolveModal] = useState({ open: false, ticketId: null, notes: '' });
   const navigate = useNavigate();
@@ -23,25 +26,77 @@ export default function TechnicianTickets() {
     try {
       await ticketsAPI.updateStatus(statusModal.ticketId, statusModal.status);
       setStatusModal({ open: false, ticketId: null, status: '' });
+      setFeedback({ type: 'success', message: 'Status updated successfully.' });
       fetchTickets();
-    } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+    } catch (e) { setFeedback({ type: 'error', message: e.response?.data?.message || 'Failed to update status.' }); }
   };
 
   const handleResolve = async () => {
     try {
       await ticketsAPI.addResolutionNotes(resolveModal.ticketId, resolveModal.notes);
       setResolveModal({ open: false, ticketId: null, notes: '' });
+      setFeedback({ type: 'success', message: 'Resolution notes saved.' });
       fetchTickets();
-    } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+    } catch (e) { setFeedback({ type: 'error', message: e.response?.data?.message || 'Failed to save notes.' }); }
+  };
+
+  const filteredTickets = tickets
+    .filter((ticket) => {
+      const query = search.trim().toLowerCase();
+      if (!query) return true;
+      return [ticket.title, ticket.category, ticket.createdByName, ticket.location]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    })
+    .filter((ticket) => (statusFilter ? ticket.status === statusFilter : true));
+
+  const stats = {
+    total: tickets.length,
+    open: tickets.filter((ticket) => ticket.status === 'OPEN').length,
+    inProgress: tickets.filter((ticket) => ticket.status === 'IN_PROGRESS').length,
+    urgent: tickets.filter((ticket) => ticket.priority === 'URGENT').length
   };
 
   if (loading) return <div className="loading"><div className="spinner"></div> Loading assigned tickets...</div>;
 
   return (
     <div>
-      <h2 style={{ marginBottom: 20 }}>My Assigned Tickets</h2>
+      <div className="ticket-page-header-row">
+        <div>
+          <h2>My Assigned Tickets</h2>
+          <p className="ticket-subtext">Update status continuously so users and admins can track progress.</p>
+        </div>
+      </div>
 
-      {tickets.length === 0 ? (
+      {feedback.message && (
+        <div className={`alert ${feedback.type === 'error' ? 'alert-error' : 'alert-success'}`}>
+          {feedback.message}
+        </div>
+      )}
+
+      <div className="ticket-stats-grid" style={{ marginBottom: 16 }}>
+        <div className="ticket-stat-card"><span>Total</span><strong>{stats.total}</strong></div>
+        <div className="ticket-stat-card"><span>Open</span><strong>{stats.open}</strong></div>
+        <div className="ticket-stat-card"><span>In Progress</span><strong>{stats.inProgress}</strong></div>
+        <div className="ticket-stat-card"><span>Urgent</span><strong>{stats.urgent}</strong></div>
+      </div>
+
+      <div className="filters">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title, category, reporter, location"
+        />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">All Status</option>
+          <option value="OPEN">Open</option>
+          <option value="IN_PROGRESS">In Progress</option>
+          <option value="RESOLVED">Resolved</option>
+          <option value="CLOSED">Closed</option>
+        </select>
+      </div>
+
+      {filteredTickets.length === 0 ? (
         <div className="empty-state"><div className="empty-icon">👷</div><p>No tickets assigned to you</p></div>
       ) : (
         <div className="card">
@@ -58,7 +113,7 @@ export default function TechnicianTickets() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map(t => (
+                {filteredTickets.map(t => (
                   <tr key={t.id}>
                     <td><strong style={{ cursor: 'pointer', color: '#4f46e5' }} onClick={() => navigate(`/app/tickets/${t.id}`)}>{t.title}</strong></td>
                     <td>{t.category}</td>

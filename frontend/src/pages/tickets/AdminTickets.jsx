@@ -6,7 +6,10 @@ export default function AdminTickets() {
   const [tickets, setTickets] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [feedback, setFeedback] = useState({ type: '', message: '' });
   const [assignModal, setAssignModal] = useState({ open: false, ticketId: null, techId: '' });
   const [statusModal, setStatusModal] = useState({ open: false, ticketId: null, status: '' });
   const [resolveModal, setResolveModal] = useState({ open: false, ticketId: null, notes: '' });
@@ -31,33 +34,76 @@ export default function AdminTickets() {
     try {
       await ticketsAPI.assignTechnician(assignModal.ticketId, assignModal.techId);
       setAssignModal({ open: false, ticketId: null, techId: '' });
+      setFeedback({ type: 'success', message: 'Technician assigned successfully.' });
       fetchData();
-    } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+    } catch (e) { setFeedback({ type: 'error', message: e.response?.data?.message || 'Failed to assign technician.' }); }
   };
 
   const handleStatusUpdate = async () => {
     try {
       await ticketsAPI.updateStatus(statusModal.ticketId, statusModal.status);
       setStatusModal({ open: false, ticketId: null, status: '' });
+      setFeedback({ type: 'success', message: 'Ticket status updated.' });
       fetchData();
-    } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+    } catch (e) { setFeedback({ type: 'error', message: e.response?.data?.message || 'Failed to update status.' }); }
   };
 
   const handleResolve = async () => {
     try {
       await ticketsAPI.addResolutionNotes(resolveModal.ticketId, resolveModal.notes);
       setResolveModal({ open: false, ticketId: null, notes: '' });
+      setFeedback({ type: 'success', message: 'Resolution notes saved.' });
       fetchData();
-    } catch (e) { alert(e.response?.data?.message || 'Failed'); }
+    } catch (e) { setFeedback({ type: 'error', message: e.response?.data?.message || 'Failed to save resolution notes.' }); }
+  };
+
+  const filteredTickets = tickets
+    .filter((ticket) => {
+      const query = search.trim().toLowerCase();
+      if (!query) return true;
+      return [ticket.title, ticket.createdByName, ticket.assignedTechnicianName, ticket.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    })
+    .filter((ticket) => (priorityFilter ? ticket.priority === priorityFilter : true));
+
+  const stats = {
+    total: tickets.length,
+    unassigned: tickets.filter((ticket) => !ticket.assignedTechnicianName).length,
+    active: tickets.filter((ticket) => ['OPEN', 'IN_PROGRESS'].includes(ticket.status)).length,
+    urgent: tickets.filter((ticket) => ticket.priority === 'URGENT').length
   };
 
   if (loading) return <div className="loading"><div className="spinner"></div> Loading tickets...</div>;
 
   return (
     <div>
-      <h2 style={{ marginBottom: 20 }}>All Tickets (Admin)</h2>
+      <div className="ticket-page-header-row">
+        <div>
+          <h2>All Tickets (Admin)</h2>
+          <p className="ticket-subtext">Monitor incidents, assign technicians, and keep the workflow moving.</p>
+        </div>
+      </div>
+
+      {feedback.message && (
+        <div className={`alert ${feedback.type === 'error' ? 'alert-error' : 'alert-success'}`}>
+          {feedback.message}
+        </div>
+      )}
+
+      <div className="ticket-stats-grid" style={{ marginBottom: 16 }}>
+        <div className="ticket-stat-card"><span>Total</span><strong>{stats.total}</strong></div>
+        <div className="ticket-stat-card"><span>Unassigned</span><strong>{stats.unassigned}</strong></div>
+        <div className="ticket-stat-card"><span>Active</span><strong>{stats.active}</strong></div>
+        <div className="ticket-stat-card"><span>Urgent</span><strong>{stats.urgent}</strong></div>
+      </div>
 
       <div className="filters">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title, requester, technician, category"
+        />
         <select value={filter} onChange={e => setFilter(e.target.value)}>
           <option value="">All Status</option>
           <option value="OPEN">Open</option>
@@ -66,9 +112,16 @@ export default function AdminTickets() {
           <option value="CLOSED">Closed</option>
           <option value="REJECTED">Rejected</option>
         </select>
+        <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
+          <option value="">All Priority</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="URGENT">Urgent</option>
+        </select>
       </div>
 
-      {tickets.length === 0 ? (
+      {filteredTickets.length === 0 ? (
         <div className="empty-state"><div className="empty-icon">📋</div><p>No tickets found</p></div>
       ) : (
         <div className="card">
@@ -86,7 +139,7 @@ export default function AdminTickets() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map(t => (
+                {filteredTickets.map(t => (
                   <tr key={t.id}>
                     <td><strong style={{ cursor: 'pointer', color: '#4f46e5' }} onClick={() => navigate(`/app/tickets/${t.id}`)}>{t.title}</strong></td>
                     <td>{t.createdByName}</td>

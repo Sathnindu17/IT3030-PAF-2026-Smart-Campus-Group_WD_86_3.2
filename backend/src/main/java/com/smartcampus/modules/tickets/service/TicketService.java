@@ -49,6 +49,11 @@ public class TicketService {
                 .build();
 
         ticket = ticketRepository.save(ticket);
+
+        // Notify ticket creator with a creation confirmation
+        notificationService.create(userId, "Ticket Created",
+            "Your ticket '" + ticket.getTitle() + "' has been created successfully.");
+
         return toResponse(ticket);
     }
 

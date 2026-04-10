@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ticketsAPI, commentsAPI } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { calculateSLAStatus, formatSLATime, getSLAColor, getSLABadgeLabel } from '../../utils/slaCalculator';
+import { getTicketCategoryMeta } from '../../components/TicketCategoryPicker';
 
 const ticketFlow = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
@@ -58,6 +60,13 @@ export default function TicketDetail() {
   const [editText, setEditText] = useState('');
   const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
+  const [slaStatus, setSlaStatus] = useState(null);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { fetchTicket(); fetchComments(); }, [id]);
@@ -66,6 +75,8 @@ export default function TicketDetail() {
     try {
       const res = await ticketsAPI.getById(id);
       setTicket(res.data.data);
+      const sla = calculateSLAStatus(res.data.data);
+      setSlaStatus(sla);
     } catch (e) {} finally { setLoading(false); }
   };
 
@@ -153,8 +164,8 @@ export default function TicketDetail() {
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <Badge config={statusConfig[ticket.status]} />
               <Badge config={priorityConfig[ticket.priority]} />
-              <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 500, padding: '3px 10px', borderRadius: 20, background: '#F1EFE8', color: '#5F5E5A' }}>
-                {ticket.category?.replace('_', ' ')}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 500, padding: '3px 10px', borderRadius: 20, background: '#F1EFE8', color: '#5F5E5A' }}>
+                {getTicketCategoryMeta(ticket.category)?.icon} {getTicketCategoryMeta(ticket.category)?.label}
               </span>
             </div>
           </div>
@@ -174,6 +185,86 @@ export default function TicketDetail() {
           color: actionMessage.type === 'error' ? '#791F1F' : '#27500A',
         }}>
           {actionMessage.text}
+        </div>
+      )}
+
+      {/* SLA Timer Section */}
+      {slaStatus && (
+        <div style={{
+          marginBottom: 24,
+          border: `2px solid ${getSLAColor(slaStatus.status).border}`,
+          background: getSLAColor(slaStatus.status).bg,
+          borderRadius: 12,
+          padding: '1rem',
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginBottom: 4,
+              }}>
+                SLA {slaStatus.type} Timeline
+              </div>
+              <div style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: getSLAColor(slaStatus.status).text,
+              }}>
+                {slaStatus.status === 'breached' ? '🚨 SLA Breached' : '⏱️ ' + formatSLATime(slaStatus.hoursRemaining) + ' Remaining'}
+              </div>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <div style={{ width: 100, height: 8, background: '#e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${Math.min(100, slaStatus.percentage)}%`,
+                    height: '100%',
+                    background: getSLAColor(slaStatus.status).badge,
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </div>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: getSLAColor(slaStatus.status).text,
+                minWidth: 35,
+              }}>
+                {Math.round(slaStatus.percentage)}%
+              </span>
+            </div>
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+            marginTop: 10,
+            fontSize: 12,
+            color: getSLAColor(slaStatus.status).text,
+          }}>
+            <div>
+              <span style={{ fontWeight: 500, opacity: 0.8 }}>Allowed: </span>
+              {slaStatus.hoursAllowed}h
+            </div>
+            <div>
+              <span style={{ fontWeight: 500, opacity: 0.8 }}>Used: </span>
+              {Math.ceil(slaStatus.elapsedHours)}h
+            </div>
+          </div>
         </div>
       )}
 

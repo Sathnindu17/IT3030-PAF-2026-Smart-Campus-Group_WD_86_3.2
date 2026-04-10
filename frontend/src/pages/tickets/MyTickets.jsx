@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ticketsAPI } from '../../api/axios';
+import { calculateSLAStatus, formatSLATime, getSLAColor } from '../../utils/slaCalculator';
+import TicketRoleGreeting from '../../components/TicketRoleGreeting';
+import { getTicketCategoryMeta } from '../../components/TicketCategoryPicker';
 
 const statusConfig = {
   OPEN:        { label: 'Open',        bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
@@ -99,6 +102,8 @@ export default function MyTickets() {
         </button>
       </div>
 
+      <TicketRoleGreeting style={{ marginBottom: '1.5rem' }} />
+
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
         {stats.map(s => (
@@ -157,7 +162,7 @@ export default function MyTickets() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '0.5px solid #e5e7eb' }}>
-                {['Title', 'Category', 'Priority', 'Status', 'Created', ''].map((h, i) => (
+                {['Title', 'Category', 'Priority', 'Status', 'SLA', 'Created', ''].map((h, i) => (
                   <th key={i} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 500, color: '#6b7280', fontSize: 11, letterSpacing: '.05em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
@@ -165,24 +170,45 @@ export default function MyTickets() {
               </tr>
             </thead>
             <tbody>
-              {filteredTickets.map((t, idx) => (
+              {filteredTickets.map((t, idx) => {
+                const sla = calculateSLAStatus(t);
+                const slaColor = sla ? getSLAColor(sla.status) : null;
+                return (
                 <tr key={t.id}
-                  style={{ borderBottom: idx < filteredTickets.length - 1 ? '0.5px solid #f3f4f6' : 'none', transition: 'background .1s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  style={{
+                    borderBottom: idx < filteredTickets.length - 1 ? '0.5px solid #f3f4f6' : 'none',
+                    transition: 'background .1s',
+                    background: sla?.breached ? 'rgba(255, 227, 227, 0.3)' : 'transparent',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = sla?.breached ? 'rgba(255, 227, 227, 0.5)' : '#fafafa'}
+                  onMouseLeave={e => e.currentTarget.style.background = sla?.breached ? 'rgba(255, 227, 227, 0.3)' : 'transparent'}
                 >
                   <td style={{ padding: '12px 16px', maxWidth: 220 }}>
                     <div style={{ fontWeight: 500, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
                     {t.location && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{t.location}</div>}
                   </td>
                   <td style={{ padding: '12px 16px', color: '#6b7280' }}>
-                    {t.category?.replace('_', ' ')}
+                    {getTicketCategoryMeta(t.category)?.icon} {getTicketCategoryMeta(t.category)?.label}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Badge config={priorityConfig[t.priority]} />
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Badge config={statusConfig[t.status]} />
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, fontWeight: 500 }}>
+                    {sla && (
+                      <div style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        background: slaColor.bg,
+                        color: slaColor.text,
+                        display: 'inline-block',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {sla.status === 'breached' ? '🚨 Breached' : formatSLATime(sla.hoursRemaining)}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px', color: '#9ca3af', whiteSpace: 'nowrap' }}>
                     {t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
@@ -198,7 +224,8 @@ export default function MyTickets() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           <div style={{ padding: '10px 16px', borderTop: '0.5px solid #f3f4f6', fontSize: 12, color: '#9ca3af' }}>

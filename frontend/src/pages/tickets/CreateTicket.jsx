@@ -1,43 +1,90 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ticketsAPI, resourcesAPI, uploadAPI } from '../../api/axios';
-
-const categories = [
-  { value: 'GENERAL', label: 'General' },
-  { value: 'ELECTRICAL', label: 'Electrical' },
-  { value: 'PLUMBING', label: 'Plumbing' },
-  { value: 'IT_EQUIPMENT', label: 'IT Equipment' },
-  { value: 'FURNITURE', label: 'Furniture' },
-  { value: 'HVAC', label: 'HVAC' },
-  { value: 'SAFETY', label: 'Safety' },
-  { value: 'OTHER', label: 'Other' },
-];
+import TicketRoleGreeting from '../../components/TicketRoleGreeting';
+import TicketCategoryPicker from '../../components/TicketCategoryPicker';
 
 const priorities = [
-  { value: 'LOW', label: 'Low', color: '#639922', bg: '#EAF3DE', border: '#639922', textColor: '#3B6D11' },
+  { value: 'LOW',    label: 'Low',    color: '#639922', bg: '#EAF3DE', border: '#639922', textColor: '#3B6D11' },
   { value: 'MEDIUM', label: 'Medium', color: '#BA7517', bg: '#FAEEDA', border: '#BA7517', textColor: '#854F0B' },
-  { value: 'HIGH', label: 'High', color: '#D85A30', bg: '#FAECE7', border: '#D85A30', textColor: '#993C1D' },
+  { value: 'HIGH',   label: 'High',   color: '#D85A30', bg: '#FAECE7', border: '#D85A30', textColor: '#993C1D' },
   { value: 'URGENT', label: 'Urgent', color: '#E24B4A', bg: '#FCEBEB', border: '#E24B4A', textColor: '#A32D2D' },
 ];
+
+const priorityGuidance = {
+  LOW: {
+    eta: 'Expected response: within 48 hours',
+    useWhen: 'Use for minor issues that do not block classes, labs, or daily operations.'
+  },
+  MEDIUM: {
+    eta: 'Expected response: within 24 hours',
+    useWhen: 'Use for noticeable issues that affect comfort or productivity but have workarounds.'
+  },
+  HIGH: {
+    eta: 'Expected response: within 8 hours',
+    useWhen: 'Use for major disruptions affecting teaching, assessments, or shared facilities.'
+  },
+  URGENT: {
+    eta: 'Expected response: within 2 hours',
+    useWhen: 'Use only for safety risks or complete service outages needing immediate attention.'
+  }
+};
+
+const quickGuide = [
+  'Use a specific title (what failed and where).',
+  'Describe visible impact and when the issue started.',
+  'Choose HIGH or URGENT only for service-blocking incidents.',
+  'Attach up to 3 clear images to speed up diagnosis.'
+];
+
+const relatedResourceKeywords = [
+  'Lecture Hall',
+  'Lab',
+  'Meeting Room',
+  'Projector',
+  'Camera',
+  'Printer'
+];
+
+const resourceTypeMeta = {
+  LECTURE_HALL: { icon: '🏛️', label: 'Lecture Hall' },
+  LAB: { icon: '🧪', label: 'Lab' },
+  MEETING_ROOM: { icon: '💼', label: 'Meeting Room' },
+  EQUIPMENT: { icon: '🧰', label: 'Equipment' },
+};
 
 export default function CreateTicket() {
   const [resources, setResources] = useState([]);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    title: '', category: 'GENERAL', description: '', priority: 'MEDIUM',
+    title: '', category: 'NETWORK', description: '', priority: 'MEDIUM',
     preferredContact: '', resourceId: '', location: '', attachmentUrls: []
   });
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState('');
   const navigate = useNavigate();
+  const selectedPriority = priorityGuidance[form.priority] || priorityGuidance.MEDIUM;
+  const selectedResourceId = form.resourceId ? String(form.resourceId) : '';
+  const resourceGroups = resources.reduce((groups, resource) => {
+    const type = resource.type || 'EQUIPMENT';
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(resource);
+    return groups;
+  }, {});
 
   useEffect(() => {
     resourcesAPI.getAll().then(res => setResources(res.data.data)).catch(() => {});
   }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleResourceChange = (e) => {
+    const value = e.target.value;
+    setForm((prev) => ({ ...prev, resourceId: value }));
+  };
 
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
@@ -72,253 +119,471 @@ export default function CreateTicket() {
     }
   };
 
+  const focusStyle = (field) => ({
+    borderColor: focusedField === field ? '#185FA5' : '#e5e7eb',
+    boxShadow: focusedField === field ? '0 0 0 3px rgba(24,95,165,0.1)' : 'none',
+  });
+
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'DM Sans, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f4f6f9', padding: '2rem 1.5rem' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', fontFamily: 'DM Sans, sans-serif' }}>
 
-      {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>
-          Tickets › New ticket
+        {/* Header */}
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ cursor: 'pointer', color: '#6b7280' }} onClick={() => navigate('/app/tickets/my')}>Tickets</span>
+            <span>›</span>
+            <span>New ticket</span>
+          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 600, margin: '0 0 6px', color: '#111827' }}>
+            Create Incident Ticket
+          </h2>
+          <p style={{ fontSize: 14, color: '#6b7280', margin: 0, lineHeight: 1.5 }}>
+            Report issues quickly with clear details so support teams can resolve them faster.
+          </p>
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 500, margin: '0 0 4px' }}>Create Incident Ticket</h2>
-        <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
-          Report issues quickly with clear details so support teams can resolve them faster.
-        </p>
-      </div>
 
-      {/* Step indicators */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-        {['Details', 'Priority', 'Attachments'].map((label, i) => {
-          const num = i + 1;
-          const isDone = step > num;
-          const isActive = step === num;
-          return (
-            <div key={label} style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: '50%', margin: '0 auto 4px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 500,
-                background: isDone ? '#639922' : isActive ? '#185FA5' : '#f3f4f6',
-                color: isDone || isActive ? '#fff' : '#9ca3af',
-                border: `1px solid ${isDone ? '#639922' : isActive ? '#185FA5' : '#e5e7eb'}`
-              }}>{num}</div>
-              <div style={{ fontSize: 11, color: isActive ? '#111' : '#9ca3af' }}>{label}</div>
-            </div>
-          );
-        })}
-      </div>
+        <TicketRoleGreeting style={{ marginBottom: '1.5rem' }} />
 
-      {/* Progress bar */}
-      <div style={{ height: 3, background: '#e5e7eb', borderRadius: 2, marginBottom: '1.75rem', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${(step / 3) * 100}%`, background: '#185FA5', borderRadius: 2, transition: 'width .3s' }} />
-      </div>
-
-      {/* Alerts */}
-      {error && (
-        <div style={{ padding: '10px 14px', background: '#FCEBEB', border: '0.5px solid #F09595', color: '#791F1F', borderRadius: 8, fontSize: 13, marginBottom: '1.25rem' }}>
-          {error}
+        {/* Quick instructions */}
+        <div style={{
+          marginBottom: '1.5rem',
+          background: 'linear-gradient(135deg, #f8fbff 0%, #f3f8ff 100%)',
+          border: '1px solid #dbeafe',
+          borderRadius: 12,
+          padding: '0.95rem 1rem',
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 8,
+            flexWrap: 'wrap',
+          }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#1e3a8a' }}>Before you submit</h3>
+            <span style={{ fontSize: 11, color: '#64748b' }}>Required for faster resolution</span>
+          </div>
+          <ul style={{ margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+            {quickGuide.map((item) => (
+              <li key={item} style={{
+                listStyle: 'none',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+                color: '#334155',
+                fontSize: 12.5,
+                lineHeight: 1.45,
+              }}>
+                <span style={{ color: '#1d4ed8', fontWeight: 700, lineHeight: 1 }}>•</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
-      {success && (
-        <div style={{ padding: '10px 14px', background: '#EAF3DE', border: '0.5px solid #97C459', color: '#27500A', borderRadius: 8, fontSize: 13, marginBottom: '1.25rem' }}>
-          {success}
-        </div>
-      )}
 
-      {/* ── STEP 1: Details ── */}
-      {step === 1 && (
-        <div style={cardStyle}>
-          <div style={sectionLabelStyle}>Basic information</div>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Issue title</label>
-            <input
-              name="title" value={form.title} onChange={handleChange}
-              placeholder="Brief title for the issue"
-              style={inputStyle}
-            />
-            <p style={hintStyle}>Minimum 5 characters. e.g. Projector not powering on in Lab 2.</p>
-          </div>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Category</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {categories.map(cat => (
-                <button
-                  key={cat.value}
-                  type="button"
-                  onClick={() => setForm({ ...form, category: cat.value })}
-                  style={{
-                    fontSize: 12, padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
-                    border: `0.5px solid ${form.category === cat.value ? '#378ADD' : '#d1d5db'}`,
-                    background: form.category === cat.value ? '#E6F1FB' : '#f9fafb',
-                    color: form.category === cat.value ? '#185FA5' : '#6b7280',
-                    fontWeight: form.category === cat.value ? 500 : 400,
-                    transition: 'all .15s',
-                  }}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Description</label>
-            <textarea
-              name="description" value={form.description} onChange={handleChange}
-              placeholder="Describe the issue — what happened, when it started, visible impact."
-              style={{ ...inputStyle, minHeight: 100, resize: 'vertical', lineHeight: 1.6 }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              <span style={hintStyle}>Minimum 10 characters.</span>
-              <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'monospace' }}>{form.description.length} chars</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div>
-              <label style={labelStyle}>Location</label>
-              <input name="location" value={form.location} onChange={handleChange}
-                placeholder="e.g. Building A, Room 201" style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Preferred contact <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11 }}>optional</span></label>
-              <input name="preferredContact" value={form.preferredContact} onChange={handleChange}
-                placeholder="Email or phone number" style={inputStyle} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-            <button onClick={() => setStep(2)} disabled={!isStep1Valid} style={isStep1Valid ? primaryBtnStyle : disabledBtnStyle}>
-              Continue →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── STEP 2: Priority ── */}
-      {step === 2 && (
-        <div style={cardStyle}>
-          <div style={sectionLabelStyle}>Priority &amp; resource</div>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Priority level</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-              {priorities.map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setForm({ ...form, priority: p.value })}
-                  style={{
-                    border: `1px solid ${form.priority === p.value ? p.border : '#e5e7eb'}`,
-                    borderRadius: 8, padding: '10px 4px', textAlign: 'center', cursor: 'pointer',
-                    background: form.priority === p.value ? p.bg : '#f9fafb',
-                    transition: 'all .15s',
-                  }}
-                >
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, margin: '0 auto 5px' }} />
-                  <span style={{ fontSize: 12, fontWeight: 500, color: form.priority === p.value ? p.textColor : '#6b7280' }}>
-                    {p.label}
+        {/* Step indicators with connector lines */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+          {['Details', 'Priority', 'Attachments'].map((label, i) => {
+            const num = i + 1;
+            const isDone = step > num;
+            const isActive = step === num;
+            return (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', flex: i < 2 ? 1 : 'none' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%',
+                    background: isDone ? '#639922' : isActive ? '#185FA5' : '#fff',
+                    border: `2px solid ${isDone ? '#639922' : isActive ? '#185FA5' : '#d1d5db'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, fontWeight: 600,
+                    color: isDone || isActive ? '#fff' : '#9ca3af',
+                    boxShadow: isActive ? '0 0 0 5px rgba(24,95,165,0.12)' : 'none',
+                    transition: 'all .3s',
+                  }}>
+                    {isDone
+                      ? <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      : num
+                    }
+                  </div>
+                  <span style={{
+                    fontSize: 12, fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#185FA5' : isDone ? '#3B6D11' : '#9ca3af',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {label}
                   </span>
-                </button>
-              ))}
+                </div>
+                {i < 2 && (
+                  <div style={{
+                    flex: 1, height: 2, marginBottom: 22, marginLeft: 8, marginRight: 8,
+                    background: step > num ? '#639922' : '#e5e7eb',
+                    transition: 'background .3s',
+                  }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Alerts */}
+        {error && (
+          <div style={{ padding: '10px 14px', background: '#FCEBEB', border: '0.5px solid #F09595', color: '#791F1F', borderRadius: 8, fontSize: 13, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 15 }}>⚠</span> {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ padding: '10px 14px', background: '#EAF3DE', border: '0.5px solid #97C459', color: '#27500A', borderRadius: 8, fontSize: 13, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 15 }}>✓</span> {success}
+          </div>
+        )}
+
+        {/* ── STEP 1: Details ── */}
+        {step === 1 && (
+          <div style={cardStyle}>
+            <div style={sectionLabelStyle}>Basic information</div>
+
+            {/* Title */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Issue title</label>
+              <input
+                name="title" value={form.title} onChange={handleChange}
+                placeholder="Brief title for the issue"
+                style={{ ...inputStyle, ...focusStyle('title') }}
+                onFocus={() => setFocusedField('title')}
+                onBlur={() => setFocusedField('')}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                <p style={hintStyle}>Minimum 5 characters. e.g. Projector not powering on in Lab 2.</p>
+                {form.title.length > 0 && (
+                  <span style={{ fontSize: 11, color: form.title.trim().length >= 5 ? '#639922' : '#E24B4A', fontWeight: 500 }}>
+                    {form.title.trim().length >= 5 ? '✓' : `${5 - form.title.trim().length} more`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Category</label>
+              <TicketCategoryPicker value={form.category} onChange={(value) => setForm({ ...form, category: value })} />
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Description</label>
+              <textarea
+                name="description" value={form.description} onChange={handleChange}
+                placeholder="Describe the issue — what happened, when it started, visible impact."
+                style={{ ...inputStyle, ...focusStyle('description'), minHeight: 110, resize: 'vertical', lineHeight: 1.6 }}
+                onFocus={() => setFocusedField('description')}
+                onBlur={() => setFocusedField('')}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                <span style={hintStyle}>Minimum 10 characters.</span>
+                <span style={{ fontSize: 11, color: form.description.length >= 10 ? '#639922' : '#9ca3af', fontFamily: 'monospace', fontWeight: 500 }}>
+                  {form.description.length} chars
+                </span>
+              </div>
+            </div>
+
+            {/* Location + Contact */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <label style={labelStyle}>Location</label>
+                <input name="location" value={form.location} onChange={handleChange}
+                  placeholder="e.g. Building A, Room 201"
+                  style={{ ...inputStyle, ...focusStyle('location') }}
+                  onFocus={() => setFocusedField('location')}
+                  onBlur={() => setFocusedField('')}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>
+                  Preferred contact <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11 }}>optional</span>
+                </label>
+                <input name="preferredContact" value={form.preferredContact} onChange={handleChange}
+                  placeholder="Email or phone number"
+                  style={{ ...inputStyle, ...focusStyle('contact') }}
+                  onFocus={() => setFocusedField('contact')}
+                  onBlur={() => setFocusedField('')}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #f3f4f6' }}>
+              <span style={{ fontSize: 12, color: isStep1Valid ? '#639922' : '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {isStep1Valid ? '✓ Ready to continue' : 'Fill required fields to continue'}
+              </span>
+              <button
+                onClick={() => setStep(2)}
+                disabled={!isStep1Valid}
+                style={{
+                  fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
+                  padding: '10px 28px', borderRadius: 9, border: 'none',
+                  cursor: isStep1Valid ? 'pointer' : 'not-allowed',
+                  background: isStep1Valid ? 'linear-gradient(135deg, #185FA5, #378ADD)' : '#e5e7eb',
+                  color: isStep1Valid ? '#fff' : '#9ca3af',
+                  boxShadow: isStep1Valid ? '0 2px 10px rgba(24,95,165,0.3)' : 'none',
+                  transition: 'all .2s',
+                }}
+              >
+                Continue →
+              </button>
             </div>
           </div>
+        )}
 
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Related resource <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11 }}>optional</span></label>
-            <select name="resourceId" value={form.resourceId} onChange={handleChange} style={inputStyle}>
-              <option value="">None</option>
-              {resources.map(r => (
-                <option key={r.id} value={r.id}>{r.name} — {r.location}</option>
-              ))}
-            </select>
-          </div>
+        {/* ── STEP 2: Priority ── */}
+        {step === 2 && (
+          <div style={cardStyle}>
+            <div style={sectionLabelStyle}>Priority &amp; resource</div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
-            <button onClick={() => setStep(1)} style={ghostBtnStyle}>← Back</button>
-            <button onClick={() => setStep(3)} style={primaryBtnStyle}>Continue →</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── STEP 3: Attachments ── */}
-      {step === 3 && (
-        <div style={cardStyle}>
-          <div style={sectionLabelStyle}>Attachments</div>
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Images <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11 }}>max 3</span></label>
-            <label style={{
-              display: 'block', border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '1.5rem',
-              textAlign: 'center', cursor: 'pointer', background: '#f9fafb', transition: 'all .15s'
-            }}>
-              <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
-              <div style={{ fontSize: 28, marginBottom: 6, opacity: 0.4 }}>↑</div>
-              <div style={{ fontSize: 13, color: '#6b7280' }}>Click to upload images</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>PNG, JPG, WEBP up to 5MB each</div>
-            </label>
-
-            {files.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginTop: '1rem' }}>
-                {files.map((file, index) => {
-                  const previewUrl = URL.createObjectURL(file);
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={labelStyle}>Priority level</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+                {priorities.map(p => {
+                  const isSelected = form.priority === p.value;
                   return (
-                    <div key={`${file.name}-${index}`} style={{ border: '0.5px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-                      <img src={previewUrl} alt={file.name}
-                        onLoad={() => URL.revokeObjectURL(previewUrl)}
-                        style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
-                      <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb' }}>
-                        <span style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>{file.name}</span>
-                        <button type="button" onClick={() => removeFile(index)}
-                          style={{ fontSize: 11, color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                          Remove
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, priority: p.value })}
+                      style={{
+                        border: `2px solid ${isSelected ? p.border : '#e5e7eb'}`,
+                        borderRadius: 10, padding: '14px 4px', textAlign: 'center', cursor: 'pointer',
+                        background: isSelected ? p.bg : '#fff',
+                        transition: 'all .15s',
+                        transform: isSelected ? 'translateY(-2px)' : 'none',
+                        boxShadow: isSelected ? `0 4px 12px ${p.color}33` : 'none',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <div style={{
+                        width: 10, height: 10, borderRadius: '50%',
+                        background: p.color, margin: '0 auto 8px',
+                        boxShadow: isSelected ? `0 0 0 3px ${p.color}33` : 'none',
+                      }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: isSelected ? p.textColor : '#6b7280', display: 'block' }}>
+                        {p.label}
+                      </span>
+                      {isSelected && (
+                        <span style={{ fontSize: 10, color: p.textColor, opacity: 0.7, marginTop: 3, display: 'block' }}>selected</span>
+                      )}
+                    </button>
                   );
                 })}
               </div>
-            )}
-          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
-            <button onClick={() => setStep(2)} style={ghostBtnStyle}>← Back</button>
-            <button onClick={handleSubmit} disabled={loading} style={loading ? disabledBtnStyle : primaryBtnStyle}>
-              {loading ? 'Creating...' : 'Create ticket'}
-            </button>
+              <div style={{
+                marginTop: '0.9rem',
+                border: '1px solid #dbeafe',
+                background: '#f8fbff',
+                borderRadius: 10,
+                padding: '0.8rem 0.9rem',
+                display: 'grid',
+                gap: 6,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#1e3a8a', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  Priority guidance
+                </div>
+                <div style={{ fontSize: 12.5, color: '#1f2937', fontWeight: 500 }}>
+                  {selectedPriority.eta}
+                </div>
+                <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+                  {selectedPriority.useWhen}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>
+                Related resource <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11 }}>optional</span>
+              </label>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.4 }}>
+                Choose the room or asset the issue is attached to. If nothing matches, keep it as a general issue.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {relatedResourceKeywords.map((word) => (
+                  <span
+                    key={word}
+                    style={{
+                      fontSize: 11,
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      borderRadius: 999,
+                      padding: '3px 9px',
+                    }}
+                  >
+                    {word}
+                  </span>
+                ))}
+              </div>
+              {resources.length === 0 && (
+                <div style={{
+                  marginBottom: 10,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: '1px dashed #d1d5db',
+                  background: '#fafafa',
+                  fontSize: 12,
+                  color: '#64748b',
+                }}>
+                  No related resources available yet. Add resources from the Resources page first, then they will appear here.
+                </div>
+              )}
+              <select
+                name="resourceId" value={selectedResourceId} onChange={handleResourceChange}
+                style={{ ...inputStyle, ...focusStyle('resource'), cursor: 'pointer', background: '#fff' }}
+                onFocus={() => setFocusedField('resource')}
+                onBlur={() => setFocusedField('')}
+              >
+                <option value="">None - general issue</option>
+                {Object.entries(resourceGroups).map(([type, items]) => {
+                  const meta = resourceTypeMeta[type] || resourceTypeMeta.EQUIPMENT;
+                  return (
+                    <optgroup key={type} label={`${meta.icon} ${meta.label}`}>
+                      {items.map((resource) => (
+                        <option key={resource.id} value={String(resource.id)}>
+                          {resource.name} — {resource.location} {resource.status ? `(${resource.status})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+              {selectedResourceId && (
+                <div style={{ fontSize: 11, color: '#475569', marginTop: 6 }}>
+                  Selected resource linked successfully.
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #f3f4f6' }}>
+              <button onClick={() => setStep(1)} style={ghostBtnStyle}>← Back</button>
+              <button onClick={() => setStep(3)} style={enhancedPrimaryBtn}>Continue →</button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ── STEP 3: Attachments ── */}
+        {step === 3 && (
+          <div style={cardStyle}>
+            <div style={sectionLabelStyle}>Attachments</div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>
+                Images <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11 }}>max 3</span>
+              </label>
+              <label
+                style={{
+                  display: 'block', border: '2px dashed #d1d5db', borderRadius: 12, padding: '2rem 1.5rem',
+                  textAlign: 'center', cursor: 'pointer', background: '#fafafa', transition: 'all .2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#185FA5'; e.currentTarget.style.background = '#EBF4FF'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.background = '#fafafa'; }}
+              >
+                <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+                <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.35 }}>📎</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Click to upload images</div>
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>PNG, JPG, WEBP — up to 5 MB each · max 3 files</div>
+              </label>
+
+              {files.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', margin: '12px 0 8px', fontWeight: 500 }}>
+                    {files.length} file{files.length > 1 ? 's' : ''} selected
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                    {files.map((file, index) => {
+                      const previewUrl = URL.createObjectURL(file);
+                      return (
+                        <div key={`${file.name}-${index}`} style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                          <img src={previewUrl} alt={file.name}
+                            onLoad={() => URL.revokeObjectURL(previewUrl)}
+                            style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+                          <div style={{ padding: '7px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9fafb', borderTop: '0.5px solid #e5e7eb' }}>
+                            <span style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>{file.name}</span>
+                            <button type="button" onClick={() => removeFile(index)}
+                              style={{ fontSize: 11, color: '#A32D2D', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>
+                              ✕ Remove
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #f3f4f6' }}>
+              <button onClick={() => setStep(2)} style={ghostBtnStyle}>← Back</button>
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                style={{
+                  fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
+                  padding: '10px 28px', borderRadius: 9, border: 'none',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  background: loading ? '#e5e7eb' : 'linear-gradient(135deg, #185FA5, #378ADD)',
+                  color: loading ? '#9ca3af' : '#fff',
+                  boxShadow: loading ? 'none' : '0 2px 10px rgba(24,95,165,0.3)',
+                  transition: 'all .2s',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+              >
+                {loading && (
+                  <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                )}
+                {loading ? 'Creating...' : 'Create ticket'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
     </div>
   );
 }
 
 const cardStyle = {
-  background: '#fff', border: '0.5px solid #e5e7eb',
-  borderRadius: 12, padding: '1.75rem',
+  background: '#fff',
+  border: '1px solid #e5e7eb',
+  borderLeft: '4px solid #185FA5',
+  borderRadius: 12,
+  padding: '1.75rem',
+  boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
 };
 const sectionLabelStyle = {
-  fontSize: 11, fontWeight: 500, letterSpacing: '.08em',
+  fontSize: 11, fontWeight: 600, letterSpacing: '.08em',
   textTransform: 'uppercase', color: '#9ca3af',
   marginBottom: '1.25rem', paddingBottom: '0.5rem',
-  borderBottom: '0.5px solid #e5e7eb',
+  borderBottom: '0.5px solid #f3f4f6',
 };
-const labelStyle = { display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: '0.4rem' };
+const labelStyle = {
+  display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: '0.4rem',
+};
 const inputStyle = {
   width: '100%', fontSize: 14, color: '#111827',
-  background: '#f9fafb', border: '0.5px solid #d1d5db',
+  background: '#fff', border: '1.5px solid #e5e7eb',
   borderRadius: 8, padding: '9px 12px', outline: 'none',
   fontFamily: 'inherit', boxSizing: 'border-box',
+  transition: 'border-color .2s, box-shadow .2s',
 };
-const hintStyle = { fontSize: 12, color: '#9ca3af', marginTop: 4 };
-const primaryBtnStyle = {
+const hintStyle = { fontSize: 12, color: '#9ca3af', marginTop: 4, margin: 0 };
+const enhancedPrimaryBtn = {
   fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
-  padding: '9px 24px', borderRadius: 8, border: 'none',
-  cursor: 'pointer', background: '#185FA5', color: '#fff',
+  padding: '10px 28px', borderRadius: 9, border: 'none',
+  cursor: 'pointer',
+  background: 'linear-gradient(135deg, #185FA5, #378ADD)',
+  color: '#fff',
+  boxShadow: '0 2px 10px rgba(24,95,165,0.3)',
+  transition: 'all .2s',
 };
-const disabledBtnStyle = { ...primaryBtnStyle, opacity: 0.45, cursor: 'not-allowed' };
 const ghostBtnStyle = {
   fontSize: 14, color: '#6b7280', background: 'none',
   border: 'none', fontFamily: 'inherit', cursor: 'pointer', padding: '9px 0',

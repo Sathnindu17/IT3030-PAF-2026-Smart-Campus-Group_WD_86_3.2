@@ -2,16 +2,48 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsAPI } from '../api/axios';
 
+function isDndActive() {
+  try {
+    const stored = localStorage.getItem('dnd_preferences');
+    if (!stored) return false;
+    const { dndEnabled, dndStart, dndEnd } = JSON.parse(stored);
+    if (!dndEnabled) return false;
+
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const [startH, startM] = dndStart.split(':').map(Number);
+    const [endH, endM] = dndEnd.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    if (startMinutes <= endMinutes) {
+      // Same day range (e.g. 09:00 - 17:00)
+      return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    } else {
+      // Overnight range (e.g. 22:00 - 07:00)
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    }
+  } catch {
+    return false;
+  }
+}
+
 export default function NotificationBell() {
   const [count, setCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
+  const [dnd, setDnd] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchCount();
-    const interval = setInterval(fetchCount, 30000); // poll every 30s
+    const interval = setInterval(() => {
+      fetchCount();
+      setDnd(isDndActive());
+    }, 30000); // poll every 30s
+    setDnd(isDndActive());
     return () => clearInterval(interval);
   }, []);
 
@@ -69,20 +101,35 @@ export default function NotificationBell() {
     return d.toLocaleDateString();
   };
 
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'SECURITY': return '🔐';
+      case 'BOOKING': return '📅';
+      case 'TICKET': return '🎫';
+      case 'SYSTEM': return '📢';
+      default: return '🔔';
+    }
+  };
+
+  const showBadge = count > 0 && !dnd;
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <div className="notification-bell" onClick={toggleDropdown}>
         🔔
-        {count > 0 && <span className="notification-badge">{count}</span>}
+        {showBadge && <span className="notification-badge">{count}</span>}
+        {dnd && <span className="dnd-indicator" title="Do Not Disturb is active">🔕</span>}
       </div>
 
       {open && (
         <div className="notification-dropdown">
           <div className="notification-dropdown-header">
             <h4>Notifications</h4>
-            {count > 0 && (
-              <button onClick={markAllRead} className="btn btn-sm btn-secondary">Mark all read</button>
-            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {count > 0 && (
+                <button onClick={markAllRead} className="btn btn-sm btn-secondary">Mark all read</button>
+              )}
+            </div>
           </div>
           <div className="notification-list">
             {notifications.length === 0 ? (
@@ -92,19 +139,27 @@ export default function NotificationBell() {
             ) : (
               notifications.map(n => (
                 <div key={n.id}
-                  className={`notification-item ${!n.isRead ? 'unread' : ''}`}
+                  className={`notification-item ${!n.isRead ? 'unread' : ''} ${n.type === 'SECURITY' ? 'security' : ''}`}
                   onClick={() => { if (!n.isRead) markRead(n.id); }}
                 >
-                  <div className="notif-title">{n.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{getTypeIcon(n.type)}</span>
+                    <div className="notif-title">{n.title}</div>
+                  </div>
                   <div className="notif-message">{n.message}</div>
-                  <div className="notif-time">{formatTime(n.createdAt)}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    <div className="notif-time">{formatTime(n.createdAt)}</div>
+                    {n.type && <span className={`notif-type-badge notif-type-${n.type?.toLowerCase()}`}>{n.type}</span>}
+                  </div>
                 </div>
               ))
             )}
           </div>
-          <div style={{ padding: '12px 20px', borderTop: '1px solid #f3f4f6', textAlign: 'center' }}>
+          <div style={{ padding: '12px 20px', borderTop: '1px solid #f3f4f6', textAlign: 'center', display: 'flex', gap: 8, justifyContent: 'center' }}>
             <button onClick={() => { setOpen(false); navigate('/app/notifications'); }}
               className="btn btn-sm btn-outline">View All</button>
+            <button onClick={() => { setOpen(false); navigate('/app/notifications/preferences'); }}
+              className="btn btn-sm btn-secondary">⚙️ Settings</button>
           </div>
         </div>
       )}

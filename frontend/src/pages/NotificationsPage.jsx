@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { notificationsAPI } from '../api/axios';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => { fetchNotifications(); }, []);
 
@@ -33,6 +35,16 @@ export default function NotificationsPage() {
     return new Date(dateStr).toLocaleString();
   };
 
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'SECURITY': return '🔐';
+      case 'BOOKING': return '📅';
+      case 'TICKET': return '🎫';
+      case 'SYSTEM': return '📢';
+      default: return '🔔';
+    }
+  };
+
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   if (loading) return <div className="loading"><div className="spinner"></div> Loading notifications...</div>;
@@ -41,9 +53,14 @@ export default function NotificationsPage() {
     <div style={{ maxWidth: 700 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2>Notifications {unreadCount > 0 && <span className="badge badge-open">{unreadCount} unread</span>}</h2>
-        {unreadCount > 0 && (
-          <button onClick={markAllRead} className="btn btn-sm btn-secondary">Mark all as read</button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {unreadCount > 0 && (
+            <button onClick={markAllRead} className="btn btn-sm btn-secondary">Mark all as read</button>
+          )}
+          <button onClick={() => navigate('/app/notifications/preferences')} className="btn btn-sm btn-outline">
+            ⚙️ Preferences
+          </button>
+        </div>
       </div>
 
       {notifications.length === 0 ? (
@@ -51,12 +68,18 @@ export default function NotificationsPage() {
       ) : (
         <div className="card">
           {notifications.map(n => (
-            <div key={n.id} className={`notification-item ${!n.isRead ? 'unread' : ''}`}
+            <div key={n.id} className={`notification-item ${!n.isRead ? 'unread' : ''} ${n.type === 'SECURITY' ? 'security' : ''}`}
               onClick={() => { if (!n.isRead) markRead(n.id); }}
               style={{ cursor: !n.isRead ? 'pointer' : 'default' }}>
-              <div className="notif-title">{n.title}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>{getTypeIcon(n.type)}</span>
+                <div className="notif-title">{n.title}</div>
+              </div>
               <div className="notif-message">{n.message}</div>
-              <div className="notif-time">{formatTime(n.createdAt)}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <div className="notif-time">{formatTime(n.createdAt)}</div>
+                {n.type && <span className={`notif-type-badge notif-type-${n.type?.toLowerCase()}`}>{n.type}</span>}
+              </div>
             </div>
           ))}
         </div>

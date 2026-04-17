@@ -22,6 +22,7 @@ public class Notification {
     private String recipientId;
     private String title;
     private String message;
+    private String type; // SECURITY, BOOKING, TICKET, SYSTEM, GENERAL
     private boolean isRead;
     private LocalDateTime createdAt;
 }

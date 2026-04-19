@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @RestController
@@ -24,6 +25,10 @@ public class FileUploadController {
 
     private static final List<String> ALLOWED_TYPES = List.of(
             "image/jpeg", "image/png", "image/gif", "image/webp"
+    );
+
+    private static final List<String> ALLOWED_EXTENSIONS = List.of(
+            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"
     );
 
     @PostMapping
@@ -43,7 +48,7 @@ public class FileUploadController {
 
         for (MultipartFile file : files) {
             // Validate file type
-            if (!ALLOWED_TYPES.contains(file.getContentType())) {
+            if (!isAllowedImage(file)) {
                 throw new BadRequestException("Only image files (JPEG, PNG, GIF, WebP) are allowed");
             }
 
@@ -60,5 +65,20 @@ public class FileUploadController {
         }
 
         return ResponseEntity.ok(ApiResponse.success("Files uploaded", urls));
+    }
+
+    private boolean isAllowedImage(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null && ALLOWED_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
+            return true;
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null) {
+            return false;
+        }
+
+        String lowerName = originalFilename.toLowerCase(Locale.ROOT);
+        return ALLOWED_EXTENSIONS.stream().anyMatch(lowerName::endsWith);
     }
 }

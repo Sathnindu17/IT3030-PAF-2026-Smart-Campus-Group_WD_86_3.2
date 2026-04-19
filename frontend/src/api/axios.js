@@ -1,8 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
-  headers: { 'Content-Type': 'application/json' }
+  baseURL: '/api'
 });
 
 // Attach JWT token to every request
@@ -87,9 +86,7 @@ export const uploadAPI = {
   uploadFiles: (files) => {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
-    return api.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return api.post('/upload', formData);
   },
 };
 

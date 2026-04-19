@@ -12,6 +12,7 @@ import com.smartcampus.modules.tickets.repository.TicketRepository;
 import com.smartcampus.modules.users.entity.User;
 import com.smartcampus.modules.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TicketService {
 
     private final TicketRepository ticketRepository;
@@ -50,9 +52,12 @@ public class TicketService {
 
         ticket = ticketRepository.save(ticket);
 
-        // Notify ticket creator with a creation confirmation
-        notificationService.create(userId, "Ticket Created",
-            "Your ticket '" + ticket.getTitle() + "' has been created successfully.");
+        try {
+            notificationService.create(userId, "Ticket Created",
+                    "Your ticket '" + ticket.getTitle() + "' has been created successfully.");
+        } catch (Exception ex) {
+            log.warn("Ticket {} created but notification could not be saved for user {}", ticket.getId(), userId, ex);
+        }
 
         return toResponse(ticket);
     }

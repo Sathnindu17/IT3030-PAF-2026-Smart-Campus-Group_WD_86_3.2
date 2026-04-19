@@ -103,14 +103,19 @@ export default function CreateTicket() {
     setError(''); setSuccess(''); setLoading(true);
     try {
       let attachmentUrls = [];
+      let attachmentWarning = '';
       if (files.length > 0) {
-        const uploadRes = await uploadAPI.uploadFiles(files);
-        attachmentUrls = uploadRes.data.data;
+        try {
+          const uploadRes = await uploadAPI.uploadFiles(files);
+          attachmentUrls = uploadRes.data.data;
+        } catch (uploadErr) {
+          attachmentWarning = uploadErr.response?.data?.message || 'Attachments could not be uploaded, so the ticket will be created without images';
+        }
       }
       const ticketData = { ...form, attachmentUrls };
       if (!ticketData.resourceId) delete ticketData.resourceId;
       await ticketsAPI.create(ticketData);
-      setSuccess('Ticket created successfully!');
+      setSuccess(attachmentWarning ? `Ticket created successfully. ${attachmentWarning}` : 'Ticket created successfully!');
       setTimeout(() => navigate('/app/tickets/my'), 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create ticket');

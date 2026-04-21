@@ -1,243 +1,453 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { bookingsAPI, resourcesAPI } from '../../api/axios';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { bookingsAPI, resourcesAPI } from "../../api/axios";
 
 export default function BookingForm() {
   const [searchParams] = useSearchParams();
-  const preselectedResource = searchParams.get('resourceId') || '';
+  const navigate = useNavigate();
+
+  const preselectedResource = searchParams.get("resourceId") || "";
 
   const [resources, setResources] = useState([]);
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [resourcesError, setResourcesError] = useState("");
+
   const [form, setForm] = useState({
     resourceId: preselectedResource,
-    date: '',
-    startTime: '',
-    endTime: '',
-    purpose: '',
+    date: "",
+    startTime: "",
+    endTime: "",
+    purpose: "",
     expectedAttendees: 1,
   });
 
-  const [availability, setAvailability] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [submitError, setSubmitError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const navigate = useNavigate();
+  const selectedResource = useMemo(() => {
+    return resources.find(
+      (resource) => String(resource.id || resource._id) === String(form.resourceId)
+    );
+  }, [resources, form.resourceId]);
 
-  // Fetch resources
   useEffect(() => {
-    resourcesAPI
-      .getAll({ status: 'ACTIVE' })
-      .then((res) => setResources(res.data.data))
-      .catch(() => { });
-  }, []);
+    const fetchResources = async () => {
+      setResourcesLoading(true);
+      setResourcesError("");
 
-  // Handle input change
+      try {
+        const res = await resourcesAPI.getAll({ status: "ACTIVE" });
+
+        // Support common API shapes
+        const payload = res?.data;
+        const resourceList =
+          payload?.data ||
+          payload?.content ||
+          payload?.resources ||
+          payload ||
+          [];
+
+        if (!Array.isArray(resourceList)) {
+          throw new Error("Invalid resources response from server");
+        }
+
+        setResources(resourceList);
+
+        // If preselectedResource exists but not found in DB, clear it
+        if (
+          preselectedResource &&
+          !resourceList.some(
+            (r) => String(r.id || r._id) === String(preselectedResource)
+          )
+        ) {
+          setForm((prev) => ({ ...prev, resourceId: "" }));
+        }
+      } catch (err) {
+        console.error("Failed to load resources:", err);
+
+        const message =
+          err?.response?.status === 403
+            ? "You are not allowed to load resources. Please fix backend authorization for GET /api/resources."
+            : err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load resources";
+
+        setResources([]);
+        setResourcesError(message);
+      } finally {
+        setResourcesLoading(false);
+      }
+    };
+
+    fetchResources();
+  }, [preselectedResource]);
+
   const handleChange = (e) => {
-    const value =
-      e.target.name === 'expectedAttendees'
-        ? parseInt(e.target.value) || 0
-        : e.target.value;
+    const { name, value } = e.target;
 
-    setForm({ ...form, [e.target.name]: value });
+    setForm((prev) => ({
+      ...prev,
+      [name]:
+        name === "expectedAttendees"
+          ? Math.max(1, parseInt(value, 10) || 1)
+          : value,
+    }));
   };
 
-  // Availability check
-  useEffect(() => {
-    if (form.resourceId && form.date && form.startTime && form.endTime) {
-      bookingsAPI
-        .checkAvailability(form)
-        .then((res) => setAvailability(res.data.available))
-        .catch(() => setAvailability(null));
+  const validateForm = () => {
+    if (!form.resourceId) {
+      return "Please select a resource.";
     }
-  }, [form.resourceId, form.date, form.startTime, form.endTime]);
+    if (!form.date) {
+      return "Please select a date.";
+    }
+    if (!form.startTime || !form.endTime) {
+      return "Please select both start time and end time.";
+    }
+    if (form.endTime <= form.startTime) {
+      return "End time must be after start time.";
+    }
+    if (!form.purpose.trim()) {
+      return "Purpose is required.";
+    }
+    if (form.expectedAttendees < 1) {
+      return "Expected attendees must be at least 1.";
+    }
 
-  // Submit
+    return "";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+
+    setSubmitError("");
+    setSuccess("");
+
+    const validationError = validateForm();
+    if (validationError) {
+      setSubmitError(validationError);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await bookingsAPI.create(form);
-      setSuccess('Booking request submitted!');
-      setTimeout(() => navigate('/app/bookings/my'), 1500);
+      const payload = {
+        resourceId: form.resourceId,
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        purpose: form.purpose.trim(),
+        expectedAttendees: Number(form.expectedAttendees),
+      };
+
+      await bookingsAPI.create(payload);
+
+      setSuccess("Booking request submitted successfully. Waiting for admin approval.");
+
+      setTimeout(() => {
+        navigate("/app/bookings/my");
+      }, 1200);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create booking');
+      console.error("Booking create failed:", err);
+
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to create booking";
+
+      setSubmitError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedResource = resources.find(r => r.id === form.resourceId);
-
   return (
-    <div style={{ padding: '20px' }}>
-
-      {/* 🔥 SMALL HEADER */}
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
       <div
         style={{
-          background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-          color: '#fff',
-          padding: '16px 20px',
-          borderRadius: '16px',
-          marginBottom: '20px',
-          boxShadow: '0 8px 20px rgba(79,70,229,0.2)',
+          background: "linear-gradient(135deg, rgb(79, 70, 229), rgb(124, 58, 237))",
+          color: "#fff",
+          padding: "24px",
+          borderRadius: "20px",
+          marginBottom: "24px",
+          boxShadow: "0 12px 30px rgba(79, 70, 229, 0.25)",
         }}
       >
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 600 }}>
-          📅 New Booking Request
+        <h2 style={{ margin: 0, fontSize: "2rem", fontWeight: 800 }}>
+          New Booking Request
         </h2>
-        <p style={{ marginTop: '6px', fontSize: '14px', opacity: 0.9 }}>
-          Reserve campus resources with availability checking.
+        <p style={{ marginTop: "12px", marginBottom: 0, fontSize: "1.1rem" }}>
+          Reserve campus resources quickly with validation, availability checking,
+          and a clear booking summary.
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+      {resourcesError && (
+        <div
+          style={{
+            marginBottom: "16px",
+            background: "rgb(254, 242, 242)",
+            color: "rgb(185, 28, 28)",
+            border: "1px solid rgb(254, 202, 202)",
+            padding: "14px 16px",
+            borderRadius: "12px",
+            fontWeight: 500,
+          }}
+        >
+          {resourcesError}
+        </div>
+      )}
 
-        {/* LEFT FORM */}
-        <div style={{ flex: 2, minWidth: '300px' }}>
-          <div className="card">
-            <div className="card-body">
+      {submitError && (
+        <div
+          style={{
+            marginBottom: "16px",
+            background: "#fff4f4",
+            color: "#c62828",
+            border: "1px solid #f3b7b7",
+            padding: "12px 14px",
+            borderRadius: "10px",
+          }}
+        >
+          {submitError}
+        </div>
+      )}
 
-              {error && <div className="alert alert-error">{error}</div>}
-              {success && <div className="alert alert-success">{success}</div>}
+      {success && (
+        <div
+          style={{
+            marginBottom: "16px",
+            background: "#f1fff4",
+            color: "#1b7a31",
+            border: "1px solid #b7e3c0",
+            padding: "12px 14px",
+            borderRadius: "10px",
+          }}
+        >
+          {success}
+        </div>
+      )}
 
-              <form onSubmit={handleSubmit}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: "20px",
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: "18px",
+            padding: "24px",
+            border: "1px solid #e5e7eb",
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Details</h3>
 
-                <div className="form-group">
-                  <label>Resource</label>
-                  <select
-                    name="resourceId"
-                    className="form-control"
-                    value={form.resourceId}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="">Select a resource</option>
-                    {resources.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} ({r.type?.replace(/_/g, ' ')}) - {r.location}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                Resource
+              </label>
+              <select
+                name="resourceId"
+                value={form.resourceId}
+                onChange={handleChange}
+                required
+                disabled={resourcesLoading || !!resourcesError}
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "1rem",
+                }}
+              >
+                <option value="">
+                  {resourcesLoading ? "Loading resources..." : "Select a resource"}
+                </option>
 
-                <div className="form-group">
-                  <label>Date</label>
-                  <input
-                    type="date"
-                    name="date"
-                    className="form-control"
-                    value={form.date}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Start Time</label>
-                    <input
-                      type="time"
-                      name="startTime"
-                      className="form-control"
-                      value={form.startTime}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>End Time</label>
-                    <input
-                      type="time"
-                      name="endTime"
-                      className="form-control"
-                      value={form.endTime}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* 🔥 Availability Status */}
-                {availability !== null && (
-                  <div
-                    style={{
-                      marginBottom: '10px',
-                      color: availability ? 'green' : 'red',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {availability
-                      ? '✅ Resource Available'
-                      : '❌ Resource Not Available'}
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label>Purpose</label>
-                  <textarea
-                    name="purpose"
-                    className="form-control"
-                    value={form.purpose}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Expected Attendees</label>
-                  <input
-                    type="number"
-                    name="expectedAttendees"
-                    min="1"
-                    className="form-control"
-                    value={form.expectedAttendees}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading || availability === false}
-                >
-                  {loading ? 'Submitting...' : 'Submit Booking'}
-                </button>
-              </form>
+                {resources.map((r) => {
+                  const id = r.id || r._id;
+                  return (
+                    <option key={id} value={id}>
+                      {r.name} ({String(r.type || "").replace(/_/g, " ")}) - {r.location}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
-          </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "16px",
+                marginBottom: "16px",
+              }}
+            >
+              <div>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                  Date
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={form.date}
+                  onChange={handleChange}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "1rem",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                  Expected Attendees
+                </label>
+                <input
+                  type="number"
+                  name="expectedAttendees"
+                  min="1"
+                  value={form.expectedAttendees}
+                  onChange={handleChange}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "1rem",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "16px",
+                marginBottom: "16px",
+              }}
+            >
+              <div>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  name="startTime"
+                  value={form.startTime}
+                  onChange={handleChange}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "1rem",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  name="endTime"
+                  value={form.endTime}
+                  onChange={handleChange}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "1rem",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                Purpose
+              </label>
+              <textarea
+                name="purpose"
+                value={form.purpose}
+                onChange={handleChange}
+                required
+                rows="4"
+                placeholder="Describe the purpose of this booking"
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "1rem",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || resourcesLoading || !!resourcesError}
+              style={{
+                background: loading ? "#9ca3af" : "#4f46e5",
+                color: "#fff",
+                border: "none",
+                padding: "12px 18px",
+                borderRadius: "12px",
+                fontSize: "1rem",
+                fontWeight: 700,
+                cursor:
+                  loading || resourcesLoading || !!resourcesError
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {loading ? "Submitting..." : "Submit Booking Request"}
+            </button>
+          </form>
         </div>
 
-        {/* RIGHT SUMMARY */}
-        <div style={{ flex: 1, minWidth: '250px' }}>
-          <div className="card">
-            <div className="card-body">
-              <h4>Booking Summary</h4>
-              <p><strong>Resource:</strong> {selectedResource?.name || '-'}</p>
-              <p><strong>Type:</strong> {selectedResource?.type || '-'}</p>
-              <p><strong>Location:</strong> {selectedResource?.location || '-'}</p>
-              <p><strong>Date:</strong> {form.date || '-'}</p>
-              <p><strong>Time:</strong> {form.startTime} - {form.endTime}</p>
-              <p><strong>Attendees:</strong> {form.expectedAttendees}</p>
-            </div>
-          </div>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: "18px",
+            padding: "24px",
+            border: "1px solid #e5e7eb",
+            height: "fit-content",
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Summary</h3>
 
-          <div className="card" style={{ marginTop: '15px' }}>
-            <div className="card-body">
-              <h4>Quick Tips</h4>
-              <ul style={{ paddingLeft: '18px' }}>
-                <li>Select correct resource</li>
-                <li>Avoid overlapping bookings</li>
-                <li>Provide clear purpose</li>
-              </ul>
-            </div>
-          </div>
+          <p><strong>Resource:</strong> {selectedResource?.name || "-"}</p>
+          <p><strong>Type:</strong> {selectedResource?.type?.replace(/_/g, " ") || "-"}</p>
+          <p><strong>Location:</strong> {selectedResource?.location || "-"}</p>
+          <p><strong>Date:</strong> {form.date || "-"}</p>
+          <p>
+            <strong>Time:</strong>{" "}
+            {form.startTime && form.endTime
+              ? `${form.startTime} to ${form.endTime}`
+              : "-"}
+          </p>
+          <p><strong>Attendees:</strong> {form.expectedAttendees || 1}</p>
         </div>
-
       </div>
     </div>
   );

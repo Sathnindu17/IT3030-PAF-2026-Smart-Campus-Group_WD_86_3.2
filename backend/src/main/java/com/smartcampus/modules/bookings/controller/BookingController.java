@@ -22,11 +22,13 @@ public class BookingController {
     private final BookingService bookingService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<BookingResponse>> create(@Valid @RequestBody BookingRequest request,
-                                                                Authentication auth) {
+    public ResponseEntity<ApiResponse<BookingResponse>> create(
+            @Valid @RequestBody BookingRequest request,
+            Authentication auth) {
         String userId = (String) auth.getPrincipal();
         BookingResponse response = bookingService.create(request, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Booking created", response));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Booking created", response));
     }
 
     @GetMapping("/my")
@@ -54,15 +56,17 @@ public class BookingController {
     }
 
     @PatchMapping("/{id}/reject")
-    public ResponseEntity<ApiResponse<BookingResponse>> reject(@PathVariable String id,
-                                                                @RequestBody RejectRequest request) {
+    public ResponseEntity<ApiResponse<BookingResponse>> reject(
+            @PathVariable String id,
+            @RequestBody RejectRequest request) {
         BookingResponse response = bookingService.reject(id, request.getReason());
         return ResponseEntity.ok(ApiResponse.success("Booking rejected", response));
     }
 
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<ApiResponse<BookingResponse>> cancel(@PathVariable String id,
-                                                                Authentication auth) {
+    public ResponseEntity<ApiResponse<BookingResponse>> cancel(
+            @PathVariable String id,
+            Authentication auth) {
         String userId = (String) auth.getPrincipal();
         BookingResponse response = bookingService.cancel(id, userId);
         return ResponseEntity.ok(ApiResponse.success("Booking cancelled", response));

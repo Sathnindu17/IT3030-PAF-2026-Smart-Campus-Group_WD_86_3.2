@@ -32,7 +32,6 @@ public class BookingService {
     private final NotificationService notificationService;
 
     public BookingResponse create(BookingRequest request, String userId) {
-        // Validate resource exists
         Resource resource = resourceRepository.findById(request.getResourceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
 
@@ -40,15 +39,22 @@ public class BookingService {
             throw new BadRequestException("Resource is currently out of service");
         }
 
-        LocalDate date = LocalDate.parse(request.getDate());
-        LocalTime startTime = LocalTime.parse(request.getStartTime());
-        LocalTime endTime = LocalTime.parse(request.getEndTime());
+        LocalDate date;
+        LocalTime startTime;
+        LocalTime endTime;
+
+        try {
+            date = LocalDate.parse(request.getDate());
+            startTime = LocalTime.parse(request.getStartTime());
+            endTime = LocalTime.parse(request.getEndTime());
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid date or time format");
+        }
 
         if (!endTime.isAfter(startTime)) {
             throw new BadRequestException("End time must be after start time");
         }
 
-        // Check for overlapping bookings
         List<Booking> overlapping = bookingRepository.findOverlappingBookings(
                 request.getResourceId(), date, startTime, endTime);
 
@@ -62,7 +68,7 @@ public class BookingService {
                 .date(date)
                 .startTime(startTime)
                 .endTime(endTime)
-                .purpose(request.getPurpose())
+                .purpose(request.getPurpose().trim())
                 .expectedAttendees(request.getExpectedAttendees())
                 .status(Booking.BookingStatus.PENDING)
                 .createdAt(LocalDateTime.now())
@@ -70,28 +76,33 @@ public class BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
+
         return toResponse(booking);
     }
 
     public List<BookingResponse> getMyBookings(String userId, String status) {
         List<Booking> bookings;
-        if (status != null) {
-            bookings = bookingRepository.findByUserIdAndStatus(userId,
+
+        if (status != null && !status.isBlank()) {
+            bookings = bookingRepository.findByUserIdAndStatus(
+                    userId,
                     Booking.BookingStatus.valueOf(status.toUpperCase()));
         } else {
             bookings = bookingRepository.findByUserId(userId);
         }
+
         return bookings.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public List<BookingResponse> getAllBookings(String status, String date, String resourceId) {
         List<Booking> bookings;
 
-        if (status != null) {
-            bookings = bookingRepository.findByStatus(Booking.BookingStatus.valueOf(status.toUpperCase()));
-        } else if (date != null) {
+        if (status != null && !status.isBlank()) {
+            bookings = bookingRepository.findByStatus(
+                    Booking.BookingStatus.valueOf(status.toUpperCase()));
+        } else if (date != null && !date.isBlank()) {
             bookings = bookingRepository.findByDate(LocalDate.parse(date));
-        } else if (resourceId != null) {
+        } else if (resourceId != null && !resourceId.isBlank()) {
             bookings = bookingRepository.findByResourceId(resourceId);
         } else {
             bookings = bookingRepository.findAll();
@@ -112,8 +123,9 @@ public class BookingService {
         booking.setUpdatedAt(LocalDateTime.now());
         booking = bookingRepository.save(booking);
 
-        // Send notification
-        notificationService.create(booking.getUserId(), "Booking Approved",
+        notificationService.create(
+                booking.getUserId(),
+                "Booking Approved",
                 "Your booking for " + getResourceName(booking.getResourceId()) +
                         " on " + booking.getDate() + " has been approved.");
 
@@ -133,11 +145,12 @@ public class BookingService {
         booking.setUpdatedAt(LocalDateTime.now());
         booking = bookingRepository.save(booking);
 
-        // Send notification
-        notificationService.create(booking.getUserId(), "Booking Rejected",
+        notificationService.create(
+                booking.getUserId(),
+                "Booking Rejected",
                 "Your booking for " + getResourceName(booking.getResourceId()) +
                         " on " + booking.getDate() + " has been rejected. Reason: " +
-                        (reason != null ? reason : "No reason provided"));
+                        (reason != null && !reason.isBlank() ? reason : "No reason provided"));
 
         return toResponse(booking);
     }
@@ -157,18 +170,21 @@ public class BookingService {
         booking.setStatus(Booking.BookingStatus.CANCELLED);
         booking.setUpdatedAt(LocalDateTime.now());
         booking = bookingRepository.save(booking);
+
         return toResponse(booking);
     }
 
     private String getResourceName(String resourceId) {
         return resourceRepository.findById(resourceId)
-                .map(Resource::getName).orElse("Unknown Resource");
+                .map(Resource::getName)
+                .orElse("Unknown Resource");
     }
 
     private BookingResponse toResponse(Booking booking) {
         String resourceName = getResourceName(booking.getResourceId());
         String userName = userRepository.findById(booking.getUserId())
-                .map(User::getFullName).orElse("Unknown User");
+                .map(User::getFullName)
+                .orElse("Unknown User");
 
         return BookingResponse.builder()
                 .id(booking.getId())

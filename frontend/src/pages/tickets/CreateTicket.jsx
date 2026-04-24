@@ -53,6 +53,52 @@ const resourceTypeMeta = {
   EQUIPMENT: { icon: '🧰', label: 'Equipment' },
 };
 
+const timelineOptions = [
+  { value: 'STARTED_NOW', label: 'Started now' },
+  { value: 'LESS_THAN_1H', label: '< 1 hour' },
+  { value: 'TODAY', label: 'Today' },
+  { value: 'SINCE_YESTERDAY', label: 'Since yesterday' },
+];
+
+const urgencyKeywordGroups = {
+  safety: ['fire', 'smoke', 'electric shock', 'sparking', 'unsafe', 'injury', 'hazard'],
+  serviceOutage: ['outage', 'down', 'not working', 'cannot access', 'offline', 'unavailable', 'no internet'],
+  singleDevice: ['single device', 'one device', 'one pc', 'my laptop only', 'this pc only'],
+};
+
+const descriptionTemplateByCategory = {
+  DEFAULT: {
+    happened: 'Describe the exact issue and any error signs (message, sound, or behavior).',
+    where: 'Mention building, room, and affected equipment/resource.',
+    sinceWhen: 'State when it started and whether it is constant or intermittent.',
+    impact: 'Explain impact on classes, labs, bookings, or operations.',
+  },
+  NETWORK: {
+    happened: 'Internet is unstable/disconnected on affected devices; login or access may fail.',
+    where: 'Building/floor/room and network segment (Wi-Fi name or lab network).',
+    sinceWhen: 'Started at [time]; issue is continuous/intermittent.',
+    impact: 'Classes or online activities cannot proceed normally.',
+  },
+  SOFTWARE: {
+    happened: 'Application fails to open, crashes, or returns an error.',
+    where: 'Device/lab where issue occurs and software name/version if known.',
+    sinceWhen: 'Started after [update/change/time].',
+    impact: 'Users cannot complete coursework or scheduled tasks.',
+  },
+  HARDWARE: {
+    happened: 'Device is physically malfunctioning (power/display/input/peripheral failure).',
+    where: 'Asset location and device label/ID if visible.',
+    sinceWhen: 'First noticed at [time/date].',
+    impact: 'Resource is unavailable for current class/session.',
+  },
+  FACILITIES: {
+    happened: 'Facility issue observed (lighting/AC/furniture/room utility problem).',
+    where: 'Building and exact room/zone.',
+    sinceWhen: 'Started at [time/date] and current condition.',
+    impact: 'Learning environment or safety/comfort is affected.',
+  },
+};
+
 export default function CreateTicket() {
   const [resources, setResources] = useState([]);
   const [step, setStep] = useState(1);
@@ -63,10 +109,13 @@ export default function CreateTicket() {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [createdTicket, setCreatedTicket] = useState(null);
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState('');
+  const [incidentTimeline, setIncidentTimeline] = useState('');
   const navigate = useNavigate();
   const selectedPriority = priorityGuidance[form.priority] || priorityGuidance.MEDIUM;
+  const templateGuide = descriptionTemplateByCategory[form.category] || descriptionTemplateByCategory.DEFAULT;
   const selectedResourceId = form.resourceId ? String(form.resourceId) : '';
   const resourceGroups = resources.reduce((groups, resource) => {
     const type = resource.type || 'EQUIPMENT';
@@ -99,6 +148,107 @@ export default function CreateTicket() {
 
   const isStep1Valid = form.title.trim().length >= 5 && form.description.trim().length >= 10;
 
+  const getUrgencyInsights = () => {
+    const text = `${form.title} ${form.description}`.toLowerCase();
+    let score = 8;
+    const reasons = [];
+
+    const hasSafety = urgencyKeywordGroups.safety.some((k) => text.includes(k));
+    const hasOutage = urgencyKeywordGroups.serviceOutage.some((k) => text.includes(k));
+    const hasSingleDevice = urgencyKeywordGroups.singleDevice.some((k) => text.includes(k));
+
+    if (hasSafety) {
+      score += 45;
+      reasons.push('safety');
+    }
+    if (hasOutage) {
+      score += 30;
+      reasons.push('service outage');
+    }
+    if (hasSingleDevice) {
+      score -= 10;
+      reasons.push('single device');
+    }
+    if (incidentTimeline === 'STARTED_NOW' || incidentTimeline === 'LESS_THAN_1H') {
+      score += 10;
+      reasons.push('recent incident');
+    }
+    if (form.category === 'NETWORK' || form.category === 'FACILITIES') {
+      score += 8;
+    }
+
+    score = Math.max(0, Math.min(100, score));
+    const level = score >= 65 ? 'HIGH' : score >= 35 ? 'MEDIUM' : 'LOW';
+    const color = level === 'HIGH' ? '#E24B4A' : level === 'MEDIUM' ? '#BA7517' : '#639922';
+
+    return {
+      score,
+      level,
+      color,
+      reasons: reasons.length ? reasons : ['general issue'],
+    };
+  };
+
+  const urgencyInsight = getUrgencyInsights();
+
+  const getSuggestedPriority = () => {
+    if (urgencyInsight.score >= 85) return 'URGENT';
+    if (urgencyInsight.score >= 65) return 'HIGH';
+    if (urgencyInsight.score >= 35) return 'MEDIUM';
+    return 'LOW';
+  };
+
+  const suggestedPriority = getSuggestedPriority();
+  const suggestedPriorityMeta = priorities.find((p) => p.value === suggestedPriority) || priorities[1];
+
+  const applySuggestedPriority = () => {
+    setForm((prev) => ({ ...prev, priority: suggestedPriority }));
+  };
+
+  const buildDescriptionStarter = () => {
+    return [
+      `What happened: ${templateGuide.happened}`,
+      `Where: ${templateGuide.where}`,
+      `Since when: ${templateGuide.sinceWhen}`,
+      `Business impact: ${templateGuide.impact}`,
+    ].join('\n');
+  };
+
+  const useFullTemplate = () => {
+    const starter = buildDescriptionStarter();
+    setForm((prev) => ({
+      ...prev,
+      description: prev.description.trim() ? `${prev.description.trim()}\n\n${starter}` : starter,
+    }));
+  };
+
+  const useTemplateLine = (label, value) => {
+    const line = `${label}: ${value}`;
+    setForm((prev) => ({
+      ...prev,
+      description: prev.description.trim() ? `${prev.description.trim()}\n${line}` : line,
+    }));
+  };
+
+  const resetForAnotherTicket = () => {
+    setCreatedTicket(null);
+    setSuccess('');
+    setError('');
+    setStep(1);
+    setFiles([]);
+    setIncidentTimeline('');
+    setForm({
+      title: '',
+      category: 'NETWORK',
+      description: '',
+      priority: 'MEDIUM',
+      preferredContact: '',
+      resourceId: '',
+      location: '',
+      attachmentUrls: [],
+    });
+  };
+
   const handleSubmit = async () => {
     setError(''); setSuccess(''); setLoading(true);
     try {
@@ -112,11 +262,24 @@ export default function CreateTicket() {
           attachmentWarning = uploadErr.response?.data?.message || 'Attachments could not be uploaded, so the ticket will be created without images';
         }
       }
-      const ticketData = { ...form, attachmentUrls };
+      const timelineLabel = timelineOptions.find((opt) => opt.value === incidentTimeline)?.label;
+      const descriptionWithTimeline = timelineLabel
+        ? `${form.description.trim()}\n\nIncident timeline: ${timelineLabel}`
+        : form.description;
+
+      const ticketData = { ...form, description: descriptionWithTimeline, attachmentUrls };
       if (!ticketData.resourceId) delete ticketData.resourceId;
-      await ticketsAPI.create(ticketData);
+      const createRes = await ticketsAPI.create(ticketData);
+      const createdData = createRes?.data?.data || {};
+      const createdId = createdData?.id || createdData?.ticketId || null;
+      const slaTarget = selectedPriority?.eta?.replace('Expected response: ', '') || 'As per selected priority';
+
+      setCreatedTicket({
+        id: createdId,
+        slaTarget,
+        attachmentWarning,
+      });
       setSuccess(attachmentWarning ? `Ticket created successfully. ${attachmentWarning}` : 'Ticket created successfully!');
-      setTimeout(() => navigate('/app/tickets/my'), 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create ticket');
     } finally {
@@ -243,6 +406,60 @@ export default function CreateTicket() {
           </div>
         )}
 
+        {createdTicket && (
+          <div className="fade-up-soft" style={{
+            marginBottom: '1.25rem',
+            background: 'linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%)',
+            border: '1px solid #bfdbfe',
+            borderRadius: 12,
+            padding: '1rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', marginBottom: 6 }}>Submission confidence card</div>
+                <div style={{ fontSize: 12, color: '#334155', lineHeight: 1.55 }}>
+                  <div><strong>Ticket ID:</strong> {createdTicket.id || 'Generated successfully'}</div>
+                  <div><strong>SLA target:</strong> {createdTicket.slaTarget}</div>
+                  <div><strong>What happens next:</strong> Your ticket is now in the queue and will be assigned based on priority and category.</div>
+                </div>
+                {createdTicket.attachmentWarning && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#854F0B' }}>
+                    Note: {createdTicket.attachmentWarning}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className="lift-soft"
+                  type="button"
+                  onClick={() => createdTicket.id && navigate(`/app/tickets/${createdTicket.id}`)}
+                  disabled={!createdTicket.id}
+                  style={{ ...smallActionBtnStyle, opacity: createdTicket.id ? 1 : 0.6, cursor: createdTicket.id ? 'pointer' : 'not-allowed' }}
+                >
+                  View ticket
+                </button>
+                <button
+                  className="lift-soft"
+                  type="button"
+                  onClick={() => createdTicket.id && navigate(`/app/tickets/${createdTicket.id}#comments`)}
+                  disabled={!createdTicket.id}
+                  style={{ ...smallActionBtnStyle, opacity: createdTicket.id ? 1 : 0.6, cursor: createdTicket.id ? 'pointer' : 'not-allowed' }}
+                >
+                  Add comment
+                </button>
+                <button
+                  className="lift-soft"
+                  type="button"
+                  onClick={resetForAnotherTicket}
+                  style={smallActionBtnStyle}
+                >
+                  Create another
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── STEP 1: Details ── */}
         {step === 1 && (
           <div style={cardStyle}>
@@ -277,6 +494,32 @@ export default function CreateTicket() {
             {/* Description */}
             <div style={{ marginBottom: '1.25rem' }}>
               <label style={labelStyle}>Description</label>
+              <div className="fade-up-soft fade-delay-1" style={{
+                marginBottom: 8,
+                border: '1px solid #dbeafe',
+                borderRadius: 10,
+                background: '#f8fbff',
+                padding: '0.7rem 0.8rem',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a8a' }}>What good looks like ({form.category})</div>
+                  <button className="lift-soft" type="button" onClick={useFullTemplate} style={{ ...ghostBtnStyle, color: '#185FA5', fontSize: 12, padding: 0, fontWeight: 600 }}>
+                    Insert full starter
+                  </button>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#334155', lineHeight: 1.45, display: 'grid', gap: 4 }}>
+                  <div><strong>What happened:</strong> {templateGuide.happened}</div>
+                  <div><strong>Where:</strong> {templateGuide.where}</div>
+                  <div><strong>Since when:</strong> {templateGuide.sinceWhen}</div>
+                  <div><strong>Business impact:</strong> {templateGuide.impact}</div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  <button className="lift-soft" type="button" onClick={() => useTemplateLine('What happened', templateGuide.happened)} style={miniChipBtnStyle}>+ What happened</button>
+                  <button className="lift-soft" type="button" onClick={() => useTemplateLine('Where', templateGuide.where)} style={miniChipBtnStyle}>+ Where</button>
+                  <button className="lift-soft" type="button" onClick={() => useTemplateLine('Since when', templateGuide.sinceWhen)} style={miniChipBtnStyle}>+ Since when</button>
+                  <button className="lift-soft" type="button" onClick={() => useTemplateLine('Business impact', templateGuide.impact)} style={miniChipBtnStyle}>+ Business impact</button>
+                </div>
+              </div>
               <textarea
                 name="description" value={form.description} onChange={handleChange}
                 placeholder="Describe the issue — what happened, when it started, visible impact."
@@ -289,6 +532,80 @@ export default function CreateTicket() {
                 <span style={{ fontSize: 11, color: form.description.length >= 10 ? '#639922' : '#9ca3af', fontFamily: 'monospace', fontWeight: 500 }}>
                   {form.description.length} chars
                 </span>
+              </div>
+
+              {/* Smart urgency meter */}
+              <div style={{
+                marginTop: 10,
+                border: '1px solid #e5e7eb',
+                borderRadius: 10,
+                padding: '0.75rem 0.85rem',
+                background: '#fcfdff',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>Smart urgency meter (live)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: urgencyInsight.color }}>
+                    {urgencyInsight.level}
+                  </div>
+                </div>
+                <div style={{ height: 8, borderRadius: 999, background: '#edf2f7', overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{
+                    width: `${urgencyInsight.score}%`,
+                    height: '100%',
+                    borderRadius: 999,
+                    background: `linear-gradient(90deg, ${urgencyInsight.color}, ${urgencyInsight.color}CC)`,
+                    transition: 'width .25s ease',
+                  }} />
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {urgencyInsight.reasons.map((reason) => (
+                    <span key={reason} style={{
+                      fontSize: 10.5,
+                      padding: '3px 8px',
+                      borderRadius: 999,
+                      border: '1px solid #d1d5db',
+                      color: '#475569',
+                      background: '#fff',
+                      textTransform: 'capitalize',
+                    }}>
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Incident timeline chips */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Incident timeline</label>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                Tell technicians when this started for faster troubleshooting.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {timelineOptions.map((opt) => {
+                  const isActive = incidentTimeline === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setIncidentTimeline((prev) => (prev === opt.value ? '' : opt.value))}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        fontFamily: 'inherit',
+                        padding: '6px 11px',
+                        borderRadius: 999,
+                        border: `1px solid ${isActive ? '#185FA5' : '#d1d5db'}`,
+                        background: isActive ? '#ebf4ff' : '#fff',
+                        color: isActive ? '#185FA5' : '#475569',
+                        cursor: 'pointer',
+                        transition: 'all .2s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -344,6 +661,62 @@ export default function CreateTicket() {
         {step === 2 && (
           <div style={cardStyle}>
             <div style={sectionLabelStyle}>Priority &amp; resource</div>
+
+            <div style={{
+              marginBottom: '1rem',
+              border: '1px solid #dbeafe',
+              background: 'linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%)',
+              borderRadius: 10,
+              padding: '0.8rem 0.9rem',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a8a', marginBottom: 4 }}>
+                    Suggested by urgency meter
+                  </div>
+                  <div style={{ fontSize: 12, color: '#334155', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>Score: <strong style={{ color: urgencyInsight.color }}>{urgencyInsight.score}</strong></span>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                        border: `1px solid ${suggestedPriorityMeta.border}`,
+                        background: suggestedPriorityMeta.bg,
+                        color: suggestedPriorityMeta.textColor,
+                        fontWeight: 700,
+                        fontSize: 11,
+                      }}
+                    >
+                      Recommended: {suggestedPriorityMeta.label}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={applySuggestedPriority}
+                  disabled={form.priority === suggestedPriority}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                    padding: '7px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #185FA5',
+                    background: form.priority === suggestedPriority ? '#e5e7eb' : '#185FA5',
+                    color: form.priority === suggestedPriority ? '#9ca3af' : '#fff',
+                    cursor: form.priority === suggestedPriority ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {form.priority === suggestedPriority ? 'Already selected' : 'Use suggested priority'}
+                </button>
+              </div>
+              <div style={{ marginTop: 7, fontSize: 11, color: '#64748b' }}>
+                Signals: {urgencyInsight.reasons.join(', ')}
+              </div>
+            </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={labelStyle}>Priority level</label>
@@ -528,14 +901,14 @@ export default function CreateTicket() {
               <button onClick={() => setStep(2)} style={ghostBtnStyle}>← Back</button>
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || Boolean(createdTicket)}
                 style={{
                   fontSize: 14, fontWeight: 500, fontFamily: 'inherit',
                   padding: '10px 28px', borderRadius: 9, border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  background: loading ? '#e5e7eb' : 'linear-gradient(135deg, #185FA5, #378ADD)',
-                  color: loading ? '#9ca3af' : '#fff',
-                  boxShadow: loading ? 'none' : '0 2px 10px rgba(24,95,165,0.3)',
+                  cursor: (loading || createdTicket) ? 'not-allowed' : 'pointer',
+                  background: (loading || createdTicket) ? '#e5e7eb' : 'linear-gradient(135deg, #185FA5, #378ADD)',
+                  color: (loading || createdTicket) ? '#9ca3af' : '#fff',
+                  boxShadow: (loading || createdTicket) ? 'none' : '0 2px 10px rgba(24,95,165,0.3)',
                   transition: 'all .2s',
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}
@@ -543,13 +916,32 @@ export default function CreateTicket() {
                 {loading && (
                   <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
                 )}
-                {loading ? 'Creating...' : 'Create ticket'}
+                {loading ? 'Creating...' : createdTicket ? 'Ticket created' : 'Create ticket'}
               </button>
             </div>
           </div>
         )}
 
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @keyframes fadeUpSoft {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .fade-up-soft {
+            animation: fadeUpSoft 0.38s ease-out both;
+          }
+          .fade-delay-1 {
+            animation-delay: 0.08s;
+          }
+          .lift-soft {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+          }
+          .lift-soft:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(24,95,165,0.12);
+          }
+        `}</style>
       </div>
     </div>
   );
@@ -592,4 +984,26 @@ const enhancedPrimaryBtn = {
 const ghostBtnStyle = {
   fontSize: 14, color: '#6b7280', background: 'none',
   border: 'none', fontFamily: 'inherit', cursor: 'pointer', padding: '9px 0',
+};
+const smallActionBtnStyle = {
+  fontSize: 12,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  padding: '7px 10px',
+  borderRadius: 8,
+  border: '1px solid #bfd7f3',
+  background: '#fff',
+  color: '#185FA5',
+  cursor: 'pointer',
+};
+const miniChipBtnStyle = {
+  fontSize: 11,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  padding: '4px 8px',
+  borderRadius: 999,
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+  color: '#1e3a8a',
+  cursor: 'pointer',
 };

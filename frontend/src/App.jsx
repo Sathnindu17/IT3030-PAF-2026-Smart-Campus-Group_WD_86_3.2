@@ -12,6 +12,7 @@ import BookingForm from './pages/bookings/BookingForm';
 import MyBookings from './pages/bookings/MyBookings';
 import AdminBookings from './pages/bookings/AdminBookings';
 import CreateTicket from './pages/tickets/CreateTicket';
+import EditTicket from './pages/tickets/EditTicket';
 import MyTickets from './pages/tickets/MyTickets';
 import TicketDetail from './pages/tickets/TicketDetail';
 import AdminTickets from './pages/tickets/AdminTickets';
@@ -50,6 +51,7 @@ export default function App() {
             } />
             <Route path="tickets/new" element={<CreateTicket />} />
             <Route path="tickets/my" element={<MyTickets />} />
+            <Route path="tickets/:id/edit" element={<EditTicket />} />
             <Route path="tickets/:id" element={<TicketDetail />} />
             <Route path="tickets/admin" element={
               <ProtectedRoute roles={['ADMIN']}><AdminTickets /></ProtectedRoute>

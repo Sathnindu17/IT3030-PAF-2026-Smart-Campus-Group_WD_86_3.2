@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -146,6 +147,66 @@ public class TicketService {
         ticket.setUpdatedAt(LocalDateTime.now());
         ticket = ticketRepository.save(ticket);
         return toResponse(ticket);
+    }
+
+    public TicketResponse updateTicket(String ticketId, Map<String, String> updates, String userId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        // Only allow the ticket creator to update the ticket
+        if (!ticket.getCreatedBy().equals(userId)) {
+            throw new BadRequestException("You can only edit your own tickets");
+        }
+
+        // Only allow updates if ticket status is OPEN
+        if (ticket.getStatus() != Ticket.TicketStatus.OPEN) {
+            throw new BadRequestException("Only open tickets can be edited");
+        }
+
+        // Update allowed fields
+        if (updates.containsKey("title")) {
+            ticket.setTitle(updates.get("title"));
+        }
+        if (updates.containsKey("category")) {
+            ticket.setCategory(updates.get("category"));
+        }
+        if (updates.containsKey("description")) {
+            ticket.setDescription(updates.get("description"));
+        }
+        if (updates.containsKey("priority")) {
+            ticket.setPriority(parsePriority(updates.get("priority")));
+        }
+        if (updates.containsKey("preferredContact")) {
+            ticket.setPreferredContact(updates.get("preferredContact"));
+        }
+        if (updates.containsKey("location")) {
+            ticket.setLocation(updates.get("location"));
+        }
+        if (updates.containsKey("resourceId")) {
+            String resourceId = updates.get("resourceId");
+            ticket.setResourceId(resourceId.isEmpty() ? null : resourceId);
+        }
+
+        ticket.setUpdatedAt(LocalDateTime.now());
+        ticket = ticketRepository.save(ticket);
+        return toResponse(ticket);
+    }
+
+    public void deleteTicket(String ticketId, String userId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        // Only allow the ticket creator to delete the ticket
+        if (!ticket.getCreatedBy().equals(userId)) {
+            throw new BadRequestException("You can only delete your own tickets");
+        }
+
+        // Only allow deletion if ticket status is OPEN
+        if (ticket.getStatus() != Ticket.TicketStatus.OPEN) {
+            throw new BadRequestException("Only open tickets can be deleted");
+        }
+
+        ticketRepository.deleteById(ticketId);
     }
 
     private Ticket.TicketPriority parsePriority(String priority) {

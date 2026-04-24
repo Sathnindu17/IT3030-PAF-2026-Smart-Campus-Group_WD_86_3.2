@@ -63,6 +63,8 @@ export const ticketsAPI = {
   assignTechnician: (id, technicianId) => api.patch(`/tickets/${id}/assign`, { technicianId }),
   updateStatus: (id, status) => api.patch(`/tickets/${id}/status`, { status }),
   addResolutionNotes: (id, resolutionNotes) => api.patch(`/tickets/${id}/resolve`, { resolutionNotes }),
+  delete: (id) => api.delete(`/tickets/${id}`),
+  update: (id, data) => api.patch(`/tickets/${id}`, data),
 };
 
 // ============ Comments API ============

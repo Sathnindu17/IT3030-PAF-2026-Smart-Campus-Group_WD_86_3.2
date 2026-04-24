@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
 
 export default function AppLayout() {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -82,13 +82,19 @@ export default function AppLayout() {
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{initial}</div>
             <div className="sidebar-user-info">
-              <div className="name">{user?.fullName}</div>
-              <div className="role">{user?.role}</div>
+              <div className="name">{user?.fullName || 'Guest'}</div>
+              <div className="role">{user?.role || 'VISITOR'}</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-secondary btn-sm" style={{ width: '100%', marginTop: 12 }}>
-            Logout
-          </button>
+          {isAuthenticated ? (
+            <button onClick={handleLogout} className="btn btn-secondary btn-sm" style={{ width: '100%', marginTop: 12 }}>
+              Logout
+            </button>
+          ) : (
+            <button onClick={() => navigate('/login')} className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 12 }}>
+              Login
+            </button>
+          )}
         </div>
       </aside>
 
@@ -99,7 +105,7 @@ export default function AppLayout() {
             <h1>Smart Campus Hub</h1>
           </div>
           <div className="topbar-actions">
-            <NotificationBell />
+            {isAuthenticated ? <NotificationBell /> : null}
           </div>
         </div>
         <div className="page-content">

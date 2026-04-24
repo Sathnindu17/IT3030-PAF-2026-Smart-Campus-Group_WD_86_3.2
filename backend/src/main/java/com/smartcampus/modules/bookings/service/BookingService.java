@@ -6,6 +6,7 @@ import com.smartcampus.common.exception.ForbiddenException;
 import com.smartcampus.common.exception.ResourceNotFoundException;
 import com.smartcampus.modules.bookings.dto.BookingRequest;
 import com.smartcampus.modules.bookings.dto.BookingResponse;
+import com.smartcampus.modules.bookings.dto.ResourceAvailabilityResponse;
 import com.smartcampus.modules.bookings.entity.Booking;
 import com.smartcampus.modules.bookings.repository.BookingRepository;
 import com.smartcampus.modules.notifications.service.NotificationService;
@@ -19,7 +20,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -158,6 +161,75 @@ public class BookingService {
         booking.setUpdatedAt(LocalDateTime.now());
         booking = bookingRepository.save(booking);
         return toResponse(booking);
+    }
+
+    public List<ResourceAvailabilityResponse> getResourceAvailability() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Booking> approvedBookings = bookingRepository.findByStatus(Booking.BookingStatus.APPROVED);
+        List<Booking> pendingBookings = bookingRepository.findByStatus(Booking.BookingStatus.PENDING);
+
+        List<Booking> relevantBookings = approvedBookings.stream()
+                .filter(booking -> !LocalDateTime.of(booking.getDate(), booking.getEndTime()).isBefore(now))
+                .collect(Collectors.toList());
+        relevantBookings.addAll(
+                pendingBookings.stream()
+                        .filter(booking -> !LocalDateTime.of(booking.getDate(), booking.getEndTime()).isBefore(now))
+                        .collect(Collectors.toList())
+        );
+
+        Map<String, Booking> currentlyBookedByResource = new HashMap<>();
+        Map<String, Booking> nextBookingByResource = new HashMap<>();
+
+        for (Booking booking : relevantBookings) {
+            LocalDateTime startAt = LocalDateTime.of(booking.getDate(), booking.getStartTime());
+            LocalDateTime endAt = LocalDateTime.of(booking.getDate(), booking.getEndTime());
+
+            if (!now.isBefore(startAt) && now.isBefore(endAt)) {
+                Booking current = currentlyBookedByResource.get(booking.getResourceId());
+                if (current == null ||
+                        endAt.isAfter(LocalDateTime.of(current.getDate(), current.getEndTime()))) {
+                    currentlyBookedByResource.put(booking.getResourceId(), booking);
+                }
+                continue;
+            }
+
+            if (startAt.isAfter(now)) {
+                Booking next = nextBookingByResource.get(booking.getResourceId());
+                if (next == null ||
+                        startAt.isBefore(LocalDateTime.of(next.getDate(), next.getStartTime()))) {
+                    nextBookingByResource.put(booking.getResourceId(), booking);
+                }
+            }
+        }
+
+        return resourceRepository.findAll().stream()
+                .map(resource -> {
+                    Booking current = currentlyBookedByResource.get(resource.getId());
+                    if (current != null) {
+                        return ResourceAvailabilityResponse.builder()
+                                .resourceId(resource.getId())
+                                .status("CURRENTLY_BOOKED")
+                                .availableAfter(LocalDateTime.of(current.getDate(), current.getEndTime()).toString())
+                                .build();
+                    }
+
+                    Booking next = nextBookingByResource.get(resource.getId());
+                    if (next != null) {
+                        return ResourceAvailabilityResponse.builder()
+                                .resourceId(resource.getId())
+                                .status("AVAILABLE_AFTER")
+                                .availableAfter(LocalDateTime.of(next.getDate(), next.getStartTime()).toString())
+                                .build();
+                    }
+
+                    return ResourceAvailabilityResponse.builder()
+                            .resourceId(resource.getId())
+                            .status("AVAILABLE_NOW")
+                            .availableAfter(null)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     private String getResourceName(String resourceId) {

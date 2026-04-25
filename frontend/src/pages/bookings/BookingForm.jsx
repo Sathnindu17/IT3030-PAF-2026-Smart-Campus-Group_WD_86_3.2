@@ -7,6 +7,7 @@ export default function BookingForm() {
   const navigate = useNavigate();
 
   const preselectedResource = searchParams.get("resourceId") || "";
+  const CUSTOM_RESOURCE = "CUSTOM_RESOURCE";
 
   const [resources, setResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(true);
@@ -14,6 +15,7 @@ export default function BookingForm() {
 
   const [form, setForm] = useState({
     resourceId: preselectedResource,
+    resourceName: "",
     date: "",
     startTime: "",
     endTime: "",
@@ -39,7 +41,6 @@ export default function BookingForm() {
       try {
         const res = await resourcesAPI.getAll({ status: "ACTIVE" });
 
-        // Support common API shapes
         const payload = res?.data;
         const resourceList =
           payload?.data ||
@@ -53,16 +54,6 @@ export default function BookingForm() {
         }
 
         setResources(resourceList);
-
-        // If preselectedResource exists but not found in DB, clear it
-        if (
-          preselectedResource &&
-          !resourceList.some(
-            (r) => String(r.id || r._id) === String(preselectedResource)
-          )
-        ) {
-          setForm((prev) => ({ ...prev, resourceId: "" }));
-        }
       } catch (err) {
         console.error("Failed to load resources:", err);
 
@@ -81,7 +72,7 @@ export default function BookingForm() {
     };
 
     fetchResources();
-  }, [preselectedResource]);
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -99,18 +90,27 @@ export default function BookingForm() {
     if (!form.resourceId) {
       return "Please select a resource.";
     }
+
+    if (form.resourceId === CUSTOM_RESOURCE && !form.resourceName.trim()) {
+      return "Please enter your resource name.";
+    }
+
     if (!form.date) {
       return "Please select a date.";
     }
+
     if (!form.startTime || !form.endTime) {
       return "Please select both start time and end time.";
     }
+
     if (form.endTime <= form.startTime) {
       return "End time must be after start time.";
     }
+
     if (!form.purpose.trim()) {
       return "Purpose is required.";
     }
+
     if (form.expectedAttendees < 1) {
       return "Expected attendees must be at least 1.";
     }
@@ -134,7 +134,11 @@ export default function BookingForm() {
 
     try {
       const payload = {
-        resourceId: form.resourceId,
+        resourceId: form.resourceId === CUSTOM_RESOURCE ? null : form.resourceId,
+        resourceName:
+          form.resourceId === CUSTOM_RESOURCE
+            ? form.resourceName.trim()
+            : selectedResource?.name,
         date: form.date,
         startTime: form.startTime,
         endTime: form.endTime,
@@ -246,19 +250,21 @@ export default function BookingForm() {
             border: "1px solid #e5e7eb",
           }}
         >
-          <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Details</h3>
+          <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
+            Booking Details
+          </h3>
 
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: "16px" }}>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
                 Resource
               </label>
+
               <select
                 name="resourceId"
                 value={form.resourceId}
                 onChange={handleChange}
                 required
-                disabled={resourcesLoading || !!resourcesError}
                 style={{
                   width: "100%",
                   padding: "12px 14px",
@@ -279,8 +285,34 @@ export default function BookingForm() {
                     </option>
                   );
                 })}
+
+                <option value={CUSTOM_RESOURCE}>Other / Add my own resource</option>
               </select>
             </div>
+
+            {form.resourceId === CUSTOM_RESOURCE && (
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                  Enter Resource Name
+                </label>
+
+                <input
+                  type="text"
+                  name="resourceName"
+                  value={form.resourceName}
+                  onChange={handleChange}
+                  placeholder="Example: New Building Small Lecture Hall"
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "1rem",
+                  }}
+                />
+              </div>
+            )}
 
             <div
               style={{
@@ -405,7 +437,7 @@ export default function BookingForm() {
 
             <button
               type="submit"
-              disabled={loading || resourcesLoading || !!resourcesError}
+              disabled={loading || resourcesLoading}
               style={{
                 background: loading ? "#9ca3af" : "#4f46e5",
                 color: "#fff",
@@ -414,10 +446,7 @@ export default function BookingForm() {
                 borderRadius: "12px",
                 fontSize: "1rem",
                 fontWeight: 700,
-                cursor:
-                  loading || resourcesLoading || !!resourcesError
-                    ? "not-allowed"
-                    : "pointer",
+                cursor: loading || resourcesLoading ? "not-allowed" : "pointer",
               }}
             >
               {loading ? "Submitting..." : "Submit Booking Request"}
@@ -436,16 +465,36 @@ export default function BookingForm() {
         >
           <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Summary</h3>
 
-          <p><strong>Resource:</strong> {selectedResource?.name || "-"}</p>
-          <p><strong>Type:</strong> {selectedResource?.type?.replace(/_/g, " ") || "-"}</p>
-          <p><strong>Location:</strong> {selectedResource?.location || "-"}</p>
+          <p>
+            <strong>Resource:</strong>{" "}
+            {form.resourceId === CUSTOM_RESOURCE
+              ? form.resourceName || "-"
+              : selectedResource?.name || "-"}
+          </p>
+
+          <p>
+            <strong>Type:</strong>{" "}
+            {form.resourceId === CUSTOM_RESOURCE
+              ? "Custom Resource"
+              : selectedResource?.type?.replace(/_/g, " ") || "-"}
+          </p>
+
+          <p>
+            <strong>Location:</strong>{" "}
+            {form.resourceId === CUSTOM_RESOURCE
+              ? "User entered"
+              : selectedResource?.location || "-"}
+          </p>
+
           <p><strong>Date:</strong> {form.date || "-"}</p>
+
           <p>
             <strong>Time:</strong>{" "}
             {form.startTime && form.endTime
               ? `${form.startTime} to ${form.endTime}`
               : "-"}
           </p>
+
           <p><strong>Attendees:</strong> {form.expectedAttendees || 1}</p>
         </div>
       </div>

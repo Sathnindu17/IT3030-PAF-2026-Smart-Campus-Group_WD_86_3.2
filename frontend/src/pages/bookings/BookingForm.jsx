@@ -6,8 +6,8 @@ export default function BookingForm() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const preselectedResource = searchParams.get("resourceId") || "";
   const CUSTOM_RESOURCE = "CUSTOM_RESOURCE";
+  const preselectedResource = searchParams.get("resourceId") || "";
 
   const [resources, setResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(true);
@@ -23,7 +23,10 @@ export default function BookingForm() {
     expectedAttendees: 1,
   });
 
-  const [submitError, setSubmitError] = useState("");
+  const [availability, setAvailability] = useState(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -50,22 +53,17 @@ export default function BookingForm() {
           [];
 
         if (!Array.isArray(resourceList)) {
-          throw new Error("Invalid resources response from server");
+          throw new Error("Invalid resources response");
         }
 
         setResources(resourceList);
       } catch (err) {
         console.error("Failed to load resources:", err);
-
-        const message =
-          err?.response?.status === 403
-            ? "You are not allowed to load resources. Please fix backend authorization for GET /api/resources."
-            : err?.response?.data?.message ||
-            err?.message ||
-            "Failed to load resources";
-
         setResources([]);
-        setResourcesError(message);
+        setResourcesError(
+          err?.response?.data?.message ||
+          "Failed to load resources. Please check backend authorization."
+        );
       } finally {
         setResourcesLoading(false);
       }
@@ -74,8 +72,26 @@ export default function BookingForm() {
     fetchResources();
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkAvailability();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [
+    form.resourceId,
+    form.resourceName,
+    form.date,
+    form.startTime,
+    form.endTime,
+  ]);
+
+  const isCustomResource = form.resourceId === CUSTOM_RESOURCE;
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    setAvailability(null);
 
     setForm((prev) => ({
       ...prev,
@@ -87,46 +103,87 @@ export default function BookingForm() {
   };
 
   const validateForm = () => {
-    if (!form.resourceId) {
-      return "Please select a resource.";
+    if (!form.resourceId) return "Please select a resource.";
+
+    if (isCustomResource && !form.resourceName.trim()) {
+      return "Please enter custom resource name.";
     }
 
-    if (form.resourceId === CUSTOM_RESOURCE && !form.resourceName.trim()) {
-      return "Please enter your resource name.";
-    }
-
-    if (!form.date) {
-      return "Please select a date.";
-    }
-
+    if (!form.date) return "Please select a date.";
     if (!form.startTime || !form.endTime) {
-      return "Please select both start time and end time.";
+      return "Please select start time and end time.";
     }
 
     if (form.endTime <= form.startTime) {
       return "End time must be after start time.";
     }
 
-    if (!form.purpose.trim()) {
-      return "Purpose is required.";
+    if (!form.purpose.trim()) return "Purpose is required.";
+
+    if (Number(form.expectedAttendees) < 1) {
+      return "Expected attendees must be at least 1.";
     }
 
-    if (form.expectedAttendees < 1) {
-      return "Expected attendees must be at least 1.";
+    if (availability && availability.available === false) {
+      return "Selected time slot is already booked.";
     }
 
     return "";
   };
 
+  const checkAvailability = async () => {
+    if (!form.resourceId) return;
+    if (isCustomResource && !form.resourceName.trim()) return;
+    if (!form.date || !form.startTime || !form.endTime) return;
+    if (form.endTime <= form.startTime) return;
+
+    try {
+      setCheckingAvailability(true);
+
+      const params = {
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+      };
+
+      if (isCustomResource) {
+        params.resourceName = form.resourceName.trim();
+      } else {
+        params.resourceId = form.resourceId;
+      }
+
+      const res = await bookingsAPI.checkAvailability(params);
+      const data = res?.data?.data || res?.data;
+
+      setAvailability({
+        available: Boolean(data.available),
+        message:
+          data.message ||
+          (data.available
+            ? "This time slot is available"
+            : "This time slot is already booked"),
+      });
+    } catch (err) {
+      setAvailability({
+        available: false,
+        message:
+          err?.response?.data?.message ||
+          "Could not check availability for this time slot",
+      });
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setSubmitError("");
+    setError("");
     setSuccess("");
 
     const validationError = validateForm();
     if (validationError) {
-      setSubmitError(validationError);
+      setError(validationError);
       return;
     }
 
@@ -134,11 +191,10 @@ export default function BookingForm() {
 
     try {
       const payload = {
-        resourceId: form.resourceId === CUSTOM_RESOURCE ? null : form.resourceId,
-        resourceName:
-          form.resourceId === CUSTOM_RESOURCE
-            ? form.resourceName.trim()
-            : selectedResource?.name,
+        resourceId: isCustomResource ? null : form.resourceId,
+        resourceName: isCustomResource
+          ? form.resourceName.trim()
+          : selectedResource?.name,
         date: form.date,
         startTime: form.startTime,
         endTime: form.endTime,
@@ -148,31 +204,41 @@ export default function BookingForm() {
 
       await bookingsAPI.create(payload);
 
-      setSuccess("Booking request submitted successfully. Waiting for admin approval.");
+      setSuccess("Booking request submitted! Waiting for admin approval.");
 
       setTimeout(() => {
         navigate("/app/bookings/my");
       }, 1200);
     } catch (err) {
       console.error("Booking create failed:", err);
-
-      const message =
+      setError(
         err?.response?.data?.message ||
         err?.response?.data?.error ||
-        err?.message ||
-        "Failed to create booking";
-
-      setSubmitError(message);
+        "Failed to create booking"
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const selectedResourceName = isCustomResource
+    ? form.resourceName
+    : selectedResource?.name;
+
+  const selectedResourceType = isCustomResource
+    ? "Custom Resource"
+    : selectedResource?.type?.replace(/_/g, " ");
+
+  const selectedResourceLocation = isCustomResource
+    ? "User entered"
+    : selectedResource?.location;
+
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto" }}>
       <div
         style={{
-          background: "linear-gradient(135deg, rgb(79, 70, 229), rgb(124, 58, 237))",
+          background:
+            "linear-gradient(135deg, rgb(79, 70, 229), rgb(124, 58, 237))",
           color: "#fff",
           padding: "24px",
           borderRadius: "20px",
@@ -190,47 +256,19 @@ export default function BookingForm() {
       </div>
 
       {resourcesError && (
-        <div
-          style={{
-            marginBottom: "16px",
-            background: "rgb(254, 242, 242)",
-            color: "rgb(185, 28, 28)",
-            border: "1px solid rgb(254, 202, 202)",
-            padding: "14px 16px",
-            borderRadius: "12px",
-            fontWeight: 500,
-          }}
-        >
+        <div className="alert alert-error" style={{ marginBottom: 16 }}>
           {resourcesError}
         </div>
       )}
 
-      {submitError && (
-        <div
-          style={{
-            marginBottom: "16px",
-            background: "#fff4f4",
-            color: "#c62828",
-            border: "1px solid #f3b7b7",
-            padding: "12px 14px",
-            borderRadius: "10px",
-          }}
-        >
-          {submitError}
+      {error && (
+        <div className="alert alert-error" style={{ marginBottom: 16 }}>
+          {error}
         </div>
       )}
 
       {success && (
-        <div
-          style={{
-            marginBottom: "16px",
-            background: "#f1fff4",
-            color: "#1b7a31",
-            border: "1px solid #b7e3c0",
-            padding: "12px 14px",
-            borderRadius: "10px",
-          }}
-        >
+        <div className="alert alert-success" style={{ marginBottom: 16 }}>
           {success}
         </div>
       )}
@@ -242,260 +280,200 @@ export default function BookingForm() {
           gap: "20px",
         }}
       >
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "18px",
-            padding: "24px",
-            border: "1px solid #e5e7eb",
-          }}
-        >
-          <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
-            Booking Details
-          </h3>
+        <div className="card">
+          <div className="card-body">
+            <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
+              Booking Details
+            </h3>
 
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                Resource
-              </label>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Resource</label>
+                <select
+                  name="resourceId"
+                  className="form-control"
+                  value={form.resourceId}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">
+                    {resourcesLoading ? "Loading resources..." : "Select a resource"}
+                  </option>
 
-              <select
-                name="resourceId"
-                value={form.resourceId}
-                onChange={handleChange}
-                required
-                style={{
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  border: "1px solid #d1d5db",
-                  fontSize: "1rem",
-                }}
+                  {resources.map((r) => {
+                    const id = r.id || r._id;
+                    return (
+                      <option key={id} value={id}>
+                        {r.name} ({String(r.type || "").replace(/_/g, " ")}) -{" "}
+                        {r.location}
+                      </option>
+                    );
+                  })}
+
+                  <option value={CUSTOM_RESOURCE}>
+                    Other / Add my own resource
+                  </option>
+                </select>
+              </div>
+
+              {isCustomResource && (
+                <div className="form-group">
+                  <label>Enter Resource Name</label>
+                  <input
+                    type="text"
+                    name="resourceName"
+                    className="form-control"
+                    value={form.resourceName}
+                    onChange={handleChange}
+                    placeholder="Example: Main Building Smart Classroom"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    name="date"
+                    className="form-control"
+                    value={form.date}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Expected Attendees</label>
+                  <input
+                    type="number"
+                    name="expectedAttendees"
+                    min="1"
+                    className="form-control"
+                    value={form.expectedAttendees}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Start Time</label>
+                  <input
+                    type="time"
+                    name="startTime"
+                    className="form-control"
+                    value={form.startTime}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>End Time</label>
+                  <input
+                    type="time"
+                    name="endTime"
+                    className="form-control"
+                    value={form.endTime}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              {checkingAvailability && (
+                <div
+                  style={{
+                    marginBottom: "14px",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    background: "#f3f4f6",
+                    color: "#374151",
+                    fontWeight: 600,
+                  }}
+                >
+                  Checking availability...
+                </div>
+              )}
+
+              {availability && !checkingAvailability && (
+                <div
+                  style={{
+                    marginBottom: "14px",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    background: availability.available ? "#ecfdf5" : "#fef2f2",
+                    color: availability.available ? "#047857" : "#b91c1c",
+                    border: availability.available
+                      ? "1px solid #a7f3d0"
+                      : "1px solid #fecaca",
+                    fontWeight: 700,
+                  }}
+                >
+                  {availability.available ? "✅ " : "❌ "}
+                  {availability.message}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>Purpose</label>
+                <textarea
+                  name="purpose"
+                  className="form-control"
+                  value={form.purpose}
+                  onChange={handleChange}
+                  required
+                  rows="4"
+                  placeholder="Describe the purpose of this booking"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  loading ||
+                  checkingAvailability ||
+                  (availability && availability.available === false)
+                }
               >
-                <option value="">
-                  {resourcesLoading ? "Loading resources..." : "Select a resource"}
-                </option>
-
-                {resources.map((r) => {
-                  const id = r.id || r._id;
-                  return (
-                    <option key={id} value={id}>
-                      {r.name} ({String(r.type || "").replace(/_/g, " ")}) - {r.location}
-                    </option>
-                  );
-                })}
-
-                <option value={CUSTOM_RESOURCE}>Other / Add my own resource</option>
-              </select>
-            </div>
-
-            {form.resourceId === CUSTOM_RESOURCE && (
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                  Enter Resource Name
-                </label>
-
-                <input
-                  type="text"
-                  name="resourceName"
-                  value={form.resourceName}
-                  onChange={handleChange}
-                  placeholder="Example: New Building Small Lecture Hall"
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: "12px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "1rem",
-                  }}
-                />
-              </div>
-            )}
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "16px",
-                marginBottom: "16px",
-              }}
-            >
-              <div>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                  Date
-                </label>
-                <input
-                  type="date"
-                  name="date"
-                  value={form.date}
-                  onChange={handleChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: "12px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "1rem",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                  Expected Attendees
-                </label>
-                <input
-                  type="number"
-                  name="expectedAttendees"
-                  min="1"
-                  value={form.expectedAttendees}
-                  onChange={handleChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: "12px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "1rem",
-                  }}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "16px",
-                marginBottom: "16px",
-              }}
-            >
-              <div>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                  Start Time
-                </label>
-                <input
-                  type="time"
-                  name="startTime"
-                  value={form.startTime}
-                  onChange={handleChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: "12px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "1rem",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                  End Time
-                </label>
-                <input
-                  type="time"
-                  name="endTime"
-                  value={form.endTime}
-                  onChange={handleChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: "12px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "1rem",
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>
-                Purpose
-              </label>
-              <textarea
-                name="purpose"
-                value={form.purpose}
-                onChange={handleChange}
-                required
-                rows="4"
-                placeholder="Describe the purpose of this booking"
-                style={{
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  border: "1px solid #d1d5db",
-                  fontSize: "1rem",
-                  resize: "vertical",
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || resourcesLoading}
-              style={{
-                background: loading ? "#9ca3af" : "#4f46e5",
-                color: "#fff",
-                border: "none",
-                padding: "12px 18px",
-                borderRadius: "12px",
-                fontSize: "1rem",
-                fontWeight: 700,
-                cursor: loading || resourcesLoading ? "not-allowed" : "pointer",
-              }}
-            >
-              {loading ? "Submitting..." : "Submit Booking Request"}
-            </button>
-          </form>
+                {loading ? "Submitting..." : "Submit Booking Request"}
+              </button>
+            </form>
+          </div>
         </div>
 
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "18px",
-            padding: "24px",
-            border: "1px solid #e5e7eb",
-            height: "fit-content",
-          }}
-        >
-          <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Summary</h3>
+        <div className="card" style={{ height: "fit-content" }}>
+          <div className="card-body">
+            <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
+              Booking Summary
+            </h3>
 
-          <p>
-            <strong>Resource:</strong>{" "}
-            {form.resourceId === CUSTOM_RESOURCE
-              ? form.resourceName || "-"
-              : selectedResource?.name || "-"}
-          </p>
-
-          <p>
-            <strong>Type:</strong>{" "}
-            {form.resourceId === CUSTOM_RESOURCE
-              ? "Custom Resource"
-              : selectedResource?.type?.replace(/_/g, " ") || "-"}
-          </p>
-
-          <p>
-            <strong>Location:</strong>{" "}
-            {form.resourceId === CUSTOM_RESOURCE
-              ? "User entered"
-              : selectedResource?.location || "-"}
-          </p>
-
-          <p><strong>Date:</strong> {form.date || "-"}</p>
-
-          <p>
-            <strong>Time:</strong>{" "}
-            {form.startTime && form.endTime
-              ? `${form.startTime} to ${form.endTime}`
-              : "-"}
-          </p>
-
-          <p><strong>Attendees:</strong> {form.expectedAttendees || 1}</p>
+            <p>
+              <strong>Resource:</strong> {selectedResourceName || "-"}
+            </p>
+            <p>
+              <strong>Type:</strong> {selectedResourceType || "-"}
+            </p>
+            <p>
+              <strong>Location:</strong> {selectedResourceLocation || "-"}
+            </p>
+            <p>
+              <strong>Date:</strong> {form.date || "-"}
+            </p>
+            <p>
+              <strong>Time:</strong>{" "}
+              {form.startTime && form.endTime
+                ? `${form.startTime} to ${form.endTime}`
+                : "-"}
+            </p>
+            <p>
+              <strong>Attendees:</strong> {form.expectedAttendees || 1}
+            </p>
+          </div>
         </div>
       </div>
     </div>

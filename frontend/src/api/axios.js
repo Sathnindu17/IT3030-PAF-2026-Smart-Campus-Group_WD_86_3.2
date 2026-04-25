@@ -29,9 +29,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error?.response?.status;
-
-    if (status === 401) {
+    if (error.response?.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
@@ -41,7 +39,6 @@ api.interceptors.response.use(
   }
 );
 
-// ============ Auth API ============
 export const authAPI = {
   register: (data) => api.post("/auth/register", data),
   login: (data) => api.post("/auth/login", data),
@@ -49,7 +46,6 @@ export const authAPI = {
   getMe: () => api.get("/auth/me"),
 };
 
-// ============ Resources API ============
 export const resourcesAPI = {
   getAll: (params) => api.get("/resources", { params }),
   getById: (id) => api.get(`/resources/${id}`),
@@ -58,7 +54,6 @@ export const resourcesAPI = {
   delete: (id) => api.delete(`/resources/${id}`),
 };
 
-// ============ Bookings API ============
 export const bookingsAPI = {
   create: (data) => api.post("/bookings", data),
   getMyBookings: (params) => api.get("/bookings/my", { params }),
@@ -66,9 +61,11 @@ export const bookingsAPI = {
   approve: (id) => api.patch(`/bookings/${id}/approve`),
   reject: (id, reason) => api.patch(`/bookings/${id}/reject`, { reason }),
   cancel: (id) => api.patch(`/bookings/${id}/cancel`),
+
+  checkAvailability: (params) =>
+    api.get("/bookings/check-availability", { params }),
 };
 
-// ============ Tickets API ============
 export const ticketsAPI = {
   create: (data) => api.post("/tickets", data),
   getById: (id) => api.get(`/tickets/${id}`),
@@ -83,7 +80,6 @@ export const ticketsAPI = {
     api.patch(`/tickets/${id}/resolve`, { resolutionNotes }),
 };
 
-// ============ Comments API ============
 export const commentsAPI = {
   getByTicket: (ticketId) => api.get(`/comments/ticket/${ticketId}`),
   create: (data) => api.post("/comments", data),
@@ -91,7 +87,6 @@ export const commentsAPI = {
   delete: (id) => api.delete(`/comments/${id}`),
 };
 
-// ============ Notifications API ============
 export const notificationsAPI = {
   getAll: () => api.get("/notifications"),
   getUnreadCount: () => api.get("/notifications/unread-count"),
@@ -99,7 +94,6 @@ export const notificationsAPI = {
   markAllAsRead: () => api.patch("/notifications/read-all"),
 };
 
-// ============ Upload API ============
 export const uploadAPI = {
   uploadFiles: (files) => {
     const formData = new FormData();
@@ -116,7 +110,6 @@ export const uploadAPI = {
   },
 };
 
-// ============ Users API ============
 export const usersAPI = {
   getTechnicians: () => api.get("/users/technicians"),
 };

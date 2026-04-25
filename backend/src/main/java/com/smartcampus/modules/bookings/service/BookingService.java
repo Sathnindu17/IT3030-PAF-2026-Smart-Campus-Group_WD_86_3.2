@@ -52,44 +52,21 @@ public class BookingService {
             }
         }
 
-        LocalDate date;
-        LocalTime startTime;
-        LocalTime endTime;
+        LocalDate date = parseDate(request.getDate());
+        LocalTime startTime = parseTime(request.getStartTime(), "Invalid start time format");
+        LocalTime endTime = parseTime(request.getEndTime(), "Invalid end time format");
 
-        try {
-            date = LocalDate.parse(request.getDate());
-            startTime = LocalTime.parse(request.getStartTime());
-            endTime = LocalTime.parse(request.getEndTime());
-        } catch (Exception e) {
-            throw new BadRequestException("Invalid date or time format");
-        }
+        validateBookingInputs(request, date, startTime, endTime);
 
-        if (date.isBefore(LocalDate.now())) {
-            throw new BadRequestException("Booking date cannot be in the past");
-        }
+        boolean available = checkAvailability(
+                request.getResourceId(),
+                request.getResourceName(),
+                request.getDate(),
+                request.getStartTime(),
+                request.getEndTime());
 
-        if (!endTime.isAfter(startTime)) {
-            throw new BadRequestException("End time must be after start time");
-        }
-
-        if (request.getPurpose() == null || request.getPurpose().isBlank()) {
-            throw new BadRequestException("Purpose is required");
-        }
-
-        if (request.getExpectedAttendees() == null || request.getExpectedAttendees() < 1) {
-            throw new BadRequestException("Expected attendees must be at least 1");
-        }
-
-        if (hasResourceId) {
-            List<Booking> overlapping = bookingRepository.findOverlappingBookings(
-                    request.getResourceId(),
-                    date,
-                    startTime,
-                    endTime);
-
-            if (!overlapping.isEmpty()) {
-                throw new ConflictException("Time slot conflicts with an existing booking");
-            }
+        if (!available) {
+            throw new ConflictException("Time slot conflicts with an existing booking");
         }
 
         String finalResourceName = hasResourceId
@@ -119,10 +96,59 @@ public class BookingService {
                     "Your booking request for " + finalResourceName +
                             " on " + date + " has been submitted.");
         } catch (Exception ignored) {
-            // Do not fail booking creation if notification creation fails
         }
 
         return toResponse(booking);
+    }
+
+    public boolean checkAvailability(
+            String resourceId,
+            String resourceName,
+            String dateStr,
+            String startTimeStr,
+            String endTimeStr) {
+
+        boolean hasResourceId = resourceId != null && !resourceId.isBlank();
+        boolean hasResourceName = resourceName != null && !resourceName.isBlank();
+
+        if (!hasResourceId && !hasResourceName) {
+            throw new BadRequestException("Please select a resource or enter custom resource name");
+        }
+
+        LocalDate date = parseDate(dateStr);
+        LocalTime startTime = parseTime(startTimeStr, "Invalid start time format");
+        LocalTime endTime = parseTime(endTimeStr, "Invalid end time format");
+
+        if (!endTime.isAfter(startTime)) {
+            throw new BadRequestException("End time must be after start time");
+        }
+
+        if (date.isBefore(LocalDate.now())) {
+            throw new BadRequestException("Booking date cannot be in the past");
+        }
+
+        List<Booking> overlapping;
+
+        if (hasResourceId) {
+            overlapping = bookingRepository.findOverlappingBookings(
+                    resourceId,
+                    date,
+                    startTime,
+                    endTime);
+        } else {
+            overlapping = bookingRepository.findAll().stream()
+                    .filter(b -> b.getResourceId() == null)
+                    .filter(b -> b.getResourceName() != null)
+                    .filter(b -> b.getResourceName().equalsIgnoreCase(resourceName.trim()))
+                    .filter(b -> b.getDate().equals(date))
+                    .filter(b -> b.getStatus() == Booking.BookingStatus.PENDING
+                            || b.getStatus() == Booking.BookingStatus.APPROVED)
+                    .filter(b -> startTime.isBefore(b.getEndTime())
+                            && endTime.isAfter(b.getStartTime()))
+                    .collect(Collectors.toList());
+        }
+
+        return overlapping.isEmpty();
     }
 
     public List<BookingResponse> getMyBookings(String userId, String status) {
@@ -156,11 +182,7 @@ public class BookingService {
                 throw new BadRequestException("Invalid booking status");
             }
         } else if (date != null && !date.isBlank()) {
-            try {
-                bookings = bookingRepository.findByDate(LocalDate.parse(date));
-            } catch (Exception e) {
-                throw new BadRequestException("Invalid date format");
-            }
+            bookings = bookingRepository.findByDate(parseDate(date));
         } else if (resourceId != null && !resourceId.isBlank()) {
             bookings = bookingRepository.findByResourceId(resourceId);
         } else {
@@ -207,7 +229,9 @@ public class BookingService {
 
         booking.setStatus(Booking.BookingStatus.REJECTED);
         booking.setRejectionReason(
-                reason != null && !reason.isBlank() ? reason.trim() : "No reason provided");
+                reason != null && !reason.isBlank()
+                        ? reason.trim()
+                        : "No reason provided");
         booking.setUpdatedAt(LocalDateTime.now());
 
         booking = bookingRepository.save(booking);
@@ -256,6 +280,45 @@ public class BookingService {
         }
 
         return toResponse(booking);
+    }
+
+    private void validateBookingInputs(
+            BookingRequest request,
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime) {
+
+        if (date.isBefore(LocalDate.now())) {
+            throw new BadRequestException("Booking date cannot be in the past");
+        }
+
+        if (!endTime.isAfter(startTime)) {
+            throw new BadRequestException("End time must be after start time");
+        }
+
+        if (request.getPurpose() == null || request.getPurpose().isBlank()) {
+            throw new BadRequestException("Purpose is required");
+        }
+
+        if (request.getExpectedAttendees() == null || request.getExpectedAttendees() < 1) {
+            throw new BadRequestException("Expected attendees must be at least 1");
+        }
+    }
+
+    private LocalDate parseDate(String date) {
+        try {
+            return LocalDate.parse(date);
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid date format");
+        }
+    }
+
+    private LocalTime parseTime(String time, String errorMessage) {
+        try {
+            return LocalTime.parse(time);
+        } catch (Exception e) {
+            throw new BadRequestException(errorMessage);
+        }
     }
 
     private String getResourceName(Booking booking) {

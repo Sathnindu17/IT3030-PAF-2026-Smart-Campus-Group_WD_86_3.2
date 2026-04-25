@@ -218,6 +218,7 @@ export default function MyTickets() {
 
   const navigate = useNavigate();
   const { user } = useAuth();
+  const hasActiveFilters = Boolean(search || statusFilter || priorityFilter);
 
   const loadTickets = useCallback(() => {
     setLoading(true);
@@ -339,6 +340,12 @@ export default function MyTickets() {
 
   const analytics = useMemo(() => calculateAnalytics(tickets), [tickets]);
   const orderedVisibleColumns = columnOrder.filter((key) => visibleColumns[key]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setPriorityFilter('');
+  };
 
   const columnLabel = {
     title: 'Title',
@@ -560,7 +567,59 @@ export default function MyTickets() {
       {deleteMessage.text && <div style={{ marginBottom: '0.75rem', color: deleteMessage.ticketId ? '#A32D2D' : '#3B6D11', fontSize: 12 }}>{deleteMessage.text}</div>}
 
       {filteredTickets.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', border: `1px dashed ${darkMode ? darkTheme.border : '#d1d5db'}`, borderRadius: 10, color: darkMode ? darkTheme.textSecondary : '#6b7280' }}>No tickets found.</div>
+        <div style={{
+          textAlign: 'center',
+          padding: '2.2rem 1.25rem',
+          border: `1px dashed ${darkMode ? darkTheme.border : '#cbd5e1'}`,
+          borderRadius: 14,
+          color: darkMode ? darkTheme.textSecondary : '#475569',
+          background: darkMode ? 'rgba(15,23,42,0.45)' : 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
+        }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>{hasActiveFilters ? '🔎' : '🧾'}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: darkMode ? darkTheme.textPrimary : '#0f172a', marginBottom: 6 }}>
+            {hasActiveFilters ? 'No tickets match your filters' : 'No tickets yet'}
+          </div>
+          <p style={{ margin: '0 auto 16px', maxWidth: 420, fontSize: 13, lineHeight: 1.55 }}>
+            {hasActiveFilters
+              ? 'Clear the current search or filters to bring tickets back into view.'
+              : 'Create your first ticket to start tracking issues, requests, and follow-up in one place.'}
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                style={{
+                  padding: '9px 14px',
+                  borderRadius: 10,
+                  border: `1px solid ${darkMode ? darkTheme.border : '#cbd5e1'}`,
+                  background: darkMode ? darkTheme.surfaceSecondary : '#fff',
+                  color: darkMode ? darkTheme.textPrimary : '#1f2937',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate('/app/tickets/new')}
+              style={{
+                padding: '9px 14px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'linear-gradient(135deg, #185FA5, #378ADD)',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 8px 18px rgba(24,95,165,0.22)',
+              }}
+            >
+              Create ticket
+            </button>
+          </div>
+        </div>
       ) : (
         <div style={{ border: `1px solid ${darkMode ? darkTheme.border : '#e5e7eb'}`, borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

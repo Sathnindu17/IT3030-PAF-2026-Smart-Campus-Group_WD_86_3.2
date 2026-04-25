@@ -57,6 +57,7 @@ export default function TechnicianTickets() {
     .filter((ticket) => (statusFilter ? ticket.status === statusFilter : true));
     
   const filteredTicketsByCategory = filteredTickets.filter((ticket) => (categoryFilter ? normalizeTicketCategory(ticket.category) === categoryFilter : true));
+  const hasActiveFilters = Boolean(search || statusFilter || categoryFilter);
 
   const stats = {
     total: tickets.length,
@@ -74,6 +75,13 @@ export default function TechnicianTickets() {
   };
 
   const toDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setCategoryFilter('');
+    setSelectedDateKey('');
+  };
 
   const currentMonthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
   const currentMonthEnd = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0);
@@ -280,7 +288,59 @@ export default function TechnicianTickets() {
       )}
 
       {filteredTicketsByCategory.length === 0 ? (
-        <div className="empty-state"><div className="empty-icon">👷</div><p>No tickets assigned to you</p></div>
+        <div style={{
+          textAlign: 'center',
+          padding: '2.2rem 1.25rem',
+          borderRadius: 14,
+          border: '1px dashed #cbd5e1',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
+          color: '#475569',
+        }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>{hasActiveFilters ? '🔎' : '👷'}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
+            {hasActiveFilters ? 'No assignments match your filters' : 'No tickets assigned to you'}
+          </div>
+          <p style={{ margin: '0 auto 16px', maxWidth: 420, fontSize: 13, lineHeight: 1.55 }}>
+            {hasActiveFilters
+              ? 'Clear the filters to return to the full assignment list, or refresh if you expect new work.'
+              : 'Your queue is currently clear. New tickets will appear here as they are assigned.'}
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                style={{
+                  padding: '9px 14px',
+                  borderRadius: 10,
+                  border: '1px solid #cbd5e1',
+                  background: '#fff',
+                  color: '#1f2937',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={fetchTickets}
+              style={{
+                padding: '9px 14px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'linear-gradient(135deg, #185FA5, #378ADD)',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 8px 18px rgba(24,95,165,0.22)',
+              }}
+            >
+              Refresh assignments
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="card">
           <div className="table-container">

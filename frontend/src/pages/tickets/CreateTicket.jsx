@@ -200,6 +200,29 @@ export default function CreateTicket() {
 
   const suggestedPriority = getSuggestedPriority();
   const suggestedPriorityMeta = priorities.find((p) => p.value === suggestedPriority) || priorities[1];
+  const submissionChecklist = [
+    {
+      label: 'Specific title',
+      helper: 'What failed and where',
+      complete: form.title.trim().length >= 5,
+    },
+    {
+      label: 'Context-rich description',
+      helper: 'What, where, since when',
+      complete: form.description.trim().length >= 10,
+    },
+    {
+      label: 'Timeline captured',
+      helper: 'When the incident started',
+      complete: Boolean(incidentTimeline),
+    },
+    {
+      label: 'Priority set',
+      helper: 'Urgency guidance applied',
+      complete: Boolean(form.priority),
+    },
+  ];
+  const checklistCompleteCount = submissionChecklist.filter((item) => item.complete).length;
 
   const applySuggestedPriority = () => {
     setForm((prev) => ({ ...prev, priority: suggestedPriority }));
@@ -348,6 +371,71 @@ export default function CreateTicket() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div style={{
+          marginBottom: '1.5rem',
+          borderRadius: 16,
+          padding: '1rem 1.1rem',
+          background: 'linear-gradient(135deg, #0f4c81 0%, #185FA5 45%, #378ADD 100%)',
+          color: '#fff',
+          boxShadow: '0 14px 30px rgba(24,95,165,0.2)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 240, flex: '1 1 260px' }}>
+              <div style={{ fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', opacity: 0.8, marginBottom: 6 }}>Submission readiness</div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Make this ticket easy to triage</div>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, opacity: 0.92 }}>
+                A complete ticket gets routed faster and needs fewer follow-up questions.
+              </p>
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
+                  <span style={{ opacity: 0.9 }}>Readiness score</span>
+                  <strong>{checklistCompleteCount}/{submissionChecklist.length}</strong>
+                </div>
+                <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}>
+                  <div style={{ width: `${(checklistCompleteCount / submissionChecklist.length) * 100}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #dff6c8, #ffffff)' }} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gap: 8, minWidth: 220, flex: '0 1 320px' }}>
+              {submissionChecklist.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '9px 10px',
+                    borderRadius: 12,
+                    background: item.complete ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)',
+                    border: `1px solid ${item.complete ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.14)'}`,
+                    backdropFilter: 'blur(6px)',
+                  }}
+                >
+                  <div style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: item.complete ? '#EAF3DE' : 'rgba(255,255,255,0.16)',
+                    color: item.complete ? '#3B6D11' : '#fff',
+                    flexShrink: 0,
+                  }}>
+                    {item.complete ? '✓' : '•'}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.25 }}>{item.label}</div>
+                    <div style={{ fontSize: 11, opacity: 0.86, lineHeight: 1.25 }}>{item.helper}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Step indicators with connector lines */}

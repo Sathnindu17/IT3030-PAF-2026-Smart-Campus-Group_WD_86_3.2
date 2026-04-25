@@ -1,7 +1,29 @@
 import axios from 'axios';
 
+const resolveApiBaseUrl = () => {
+  if (import.meta?.env?.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  const host = window.location.hostname;
+  const port = window.location.port;
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+  const usesViteProxyPort = port === '5173' || port === '5174' || port === '3000';
+
+  // Use Vite proxy when running on known dev ports, otherwise call backend directly.
+  if (isLocalHost && usesViteProxyPort) {
+    return '/api';
+  }
+
+  if (isLocalHost) {
+    return 'http://localhost:8088/api';
+  }
+
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: '/api'
+  baseURL: resolveApiBaseUrl()
 });
 
 // Attach JWT token to every request

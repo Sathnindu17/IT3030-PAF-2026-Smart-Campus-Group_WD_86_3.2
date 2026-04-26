@@ -9,6 +9,8 @@ export default function BookingForm() {
   const CUSTOM_RESOURCE = "CUSTOM_RESOURCE";
   const preselectedResource = searchParams.get("resourceId") || "";
 
+  const today = new Date().toISOString().split("T")[0];
+
   const [resources, setResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(true);
   const [resourcesError, setResourcesError] = useState("");
@@ -29,6 +31,8 @@ export default function BookingForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const isCustomResource = form.resourceId === CUSTOM_RESOURCE;
 
   const selectedResource = useMemo(() => {
     return resources.find(
@@ -78,20 +82,13 @@ export default function BookingForm() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [
-    form.resourceId,
-    form.resourceName,
-    form.date,
-    form.startTime,
-    form.endTime,
-  ]);
-
-  const isCustomResource = form.resourceId === CUSTOM_RESOURCE;
+  }, [form.resourceId, form.resourceName, form.date, form.startTime, form.endTime]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     setAvailability(null);
+    setError("");
 
     setForm((prev) => ({
       ...prev,
@@ -110,6 +107,11 @@ export default function BookingForm() {
     }
 
     if (!form.date) return "Please select a date.";
+
+    if (form.date < today) {
+      return "Booking date cannot be before today.";
+    }
+
     if (!form.startTime || !form.endTime) {
       return "Please select start time and end time.";
     }
@@ -135,6 +137,7 @@ export default function BookingForm() {
     if (!form.resourceId) return;
     if (isCustomResource && !form.resourceName.trim()) return;
     if (!form.date || !form.startTime || !form.endTime) return;
+    if (form.date < today) return;
     if (form.endTime <= form.startTime) return;
 
     try {
@@ -240,18 +243,17 @@ export default function BookingForm() {
           background:
             "linear-gradient(135deg, rgb(79, 70, 229), rgb(124, 58, 237))",
           color: "#fff",
-          padding: "24px",
-          borderRadius: "20px",
-          marginBottom: "24px",
-          boxShadow: "0 12px 30px rgba(79, 70, 229, 0.25)",
+          padding: "16px 22px",
+          borderRadius: "16px",
+          marginBottom: "20px",
+          boxShadow: "0 8px 22px rgba(79, 70, 229, 0.22)",
         }}
       >
-        <h2 style={{ margin: 0, fontSize: "2rem", fontWeight: 800 }}>
+        <h2 style={{ margin: 0, fontSize: "1.55rem", fontWeight: 800 }}>
           New Booking Request
         </h2>
-        <p style={{ marginTop: "12px", marginBottom: 0, fontSize: "1.1rem" }}>
-          Reserve campus resources quickly with validation, availability checking,
-          and a clear booking summary.
+        <p style={{ marginTop: "8px", marginBottom: 0, fontSize: "0.98rem" }}>
+          Reserve campus resources with validation, availability checking, and a clear summary.
         </p>
       </div>
 
@@ -339,9 +341,13 @@ export default function BookingForm() {
                     name="date"
                     className="form-control"
                     value={form.date}
+                    min={today}
                     onChange={handleChange}
                     required
                   />
+                  <small style={{ color: "#6b7280" }}>
+                    Past dates are not allowed.
+                  </small>
                 </div>
 
                 <div className="form-group">

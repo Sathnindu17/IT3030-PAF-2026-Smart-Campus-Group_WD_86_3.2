@@ -18,6 +18,7 @@ import TicketDetail from './pages/tickets/TicketDetail';
 import AdminTickets from './pages/tickets/AdminTickets';
 import TechnicianTickets from './pages/tickets/TechnicianTickets';
 import NotificationsPage from './pages/NotificationsPage';
+import NotificationPreferences from './pages/NotificationPreferences';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -60,6 +61,7 @@ export default function App() {
               <ProtectedRoute roles={['TECHNICIAN', 'ADMIN']}><TechnicianTickets /></ProtectedRoute>
             } />
             <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notifications/preferences" element={<NotificationPreferences />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

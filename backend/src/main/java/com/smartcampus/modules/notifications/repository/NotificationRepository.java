@@ -9,4 +9,9 @@ public interface NotificationRepository extends MongoRepository<Notification, St
     List<Notification> findByRecipientIdOrderByCreatedAtDesc(String recipientId);
     long countByRecipientIdAndIsReadFalse(String recipientId);
     List<Notification> findByRecipientIdAndIsReadFalse(String recipientId);
+
+    // Type-filtered queries for notification preferences
+    List<Notification> findByRecipientIdAndTypeInOrderByCreatedAtDesc(String recipientId, List<String> types);
+    long countByRecipientIdAndIsReadFalseAndTypeIn(String recipientId, List<String> types);
+    List<Notification> findByRecipientIdAndIsReadFalseAndTypeIn(String recipientId, List<String> types);
 }

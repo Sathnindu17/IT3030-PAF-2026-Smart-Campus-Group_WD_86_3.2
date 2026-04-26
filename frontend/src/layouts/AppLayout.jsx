@@ -76,6 +76,13 @@ export default function AppLayout() {
               </NavLink>
             </div>
           )}
+
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Settings</div>
+            <NavLink to="/app/notifications/preferences" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <span className="icon">⚙️</span> Notification Settings
+            </NavLink>
+          </div>
         </nav>
 
         <div className="sidebar-footer">

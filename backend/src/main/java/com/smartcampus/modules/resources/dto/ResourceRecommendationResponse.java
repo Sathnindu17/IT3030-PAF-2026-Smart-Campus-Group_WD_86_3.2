@@ -11,13 +11,13 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ResourceResponse {
-    private String id;
-    private String name;
-    private String type;
+public class ResourceRecommendationResponse {
+    private String resourceId;
+    private String resourceName;
+    private String resourceType;
     private int capacity;
     private String location;
-    private String status;
-    private String description;
     private List<String> equipment;
+    private int score;
+    private String reason;
 }

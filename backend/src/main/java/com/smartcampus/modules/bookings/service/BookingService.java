@@ -6,6 +6,9 @@ import com.smartcampus.common.exception.ForbiddenException;
 import com.smartcampus.common.exception.ResourceNotFoundException;
 import com.smartcampus.modules.bookings.dto.BookingRequest;
 import com.smartcampus.modules.bookings.dto.BookingResponse;
+import com.smartcampus.modules.bookings.dto.BookingSuggestionResponse;
+import com.smartcampus.modules.bookings.dto.ResourceAvailabilityResponse;
+import com.smartcampus.modules.bookings.dto.AlternativeResourceSuggestion;
 import com.smartcampus.modules.bookings.entity.Booking;
 import com.smartcampus.modules.bookings.repository.BookingRepository;
 import com.smartcampus.modules.notifications.service.NotificationService;
@@ -16,10 +19,14 @@ import com.smartcampus.modules.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -194,6 +201,108 @@ public class BookingService {
                 .collect(Collectors.toList());
     }
 
+        public BookingSuggestionResponse getSuggestions(String resourceId,
+                                String date,
+                                String startTime,
+                                String endTime,
+                                Integer expectedAttendees) {
+        Resource selectedResource = resourceRepository.findById(resourceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Resource not found"));
+
+        LocalDate requestDate = LocalDate.parse(date);
+        LocalTime requestedStartTime = LocalTime.parse(startTime);
+        LocalTime requestedEndTime = LocalTime.parse(endTime);
+
+        if (!requestedEndTime.isAfter(requestedStartTime)) {
+            throw new BadRequestException("End time must be after start time");
+        }
+
+        int attendees = expectedAttendees == null ? 1 : Math.max(expectedAttendees, 1);
+        long durationMinutes = Duration.between(requestedStartTime, requestedEndTime).toMinutes();
+
+        List<Booking> selectedOverlaps = bookingRepository.findOverlappingBookings(
+            resourceId,
+            requestDate,
+            requestedStartTime,
+            requestedEndTime
+        );
+        boolean hasConflict = !selectedOverlaps.isEmpty();
+
+        LocalTime nextStartTime = null;
+        LocalTime nextEndTime = null;
+
+        if (hasConflict) {
+            LocalTime probeStart = requestedStartTime;
+            LocalTime dayLimit = LocalTime.of(23, 30);
+
+            while (probeStart.isBefore(dayLimit)) {
+            LocalTime probeEnd = probeStart.plusMinutes(durationMinutes);
+            if (probeEnd.isAfter(LocalTime.MAX.minusSeconds(1))) {
+                break;
+            }
+
+            List<Booking> overlaps = bookingRepository.findOverlappingBookings(
+                resourceId,
+                requestDate,
+                probeStart,
+                probeEnd
+            );
+
+            if (overlaps.isEmpty()) {
+                nextStartTime = probeStart;
+                nextEndTime = probeEnd;
+                break;
+            }
+
+            LocalTime maxEnd = overlaps.stream()
+                .map(Booking::getEndTime)
+                .max(LocalTime::compareTo)
+                .orElse(probeEnd);
+
+            if (!maxEnd.isAfter(probeStart)) {
+                break;
+            }
+
+            probeStart = maxEnd;
+            }
+        }
+
+        List<AlternativeResourceSuggestion> alternatives = resourceRepository.findByStatus(Resource.ResourceStatus.ACTIVE)
+            .stream()
+            .filter(resource -> !resource.getId().equals(resourceId))
+            .filter(resource -> resource.getCapacity() >= attendees)
+            .filter(resource -> bookingRepository.findOverlappingBookings(
+                resource.getId(),
+                requestDate,
+                requestedStartTime,
+                requestedEndTime
+            ).isEmpty())
+            .sorted(Comparator.comparingInt(resource -> Math.abs(resource.getCapacity() - attendees)))
+            .limit(4)
+            .map(resource -> AlternativeResourceSuggestion.builder()
+                .resourceId(resource.getId())
+                .resourceName(resource.getName())
+                .resourceType(resource.getType().name())
+                .location(resource.getLocation())
+                .capacity(resource.getCapacity())
+                .build())
+            .collect(Collectors.toList());
+
+        String message = hasConflict
+            ? "Requested slot has a conflict. Try a suggested option below."
+            : "Requested slot is available. You can continue with this booking.";
+
+        return BookingSuggestionResponse.builder()
+            .hasConflict(hasConflict)
+            .message(message)
+            .requestedResourceId(selectedResource.getId())
+            .requestedResourceName(selectedResource.getName())
+            .nextAvailableStartTime(nextStartTime != null ? nextStartTime.toString() : null)
+            .suggestedEndTime(nextEndTime != null ? nextEndTime.toString() : null)
+            .alternatives(alternatives)
+            .build();
+        }
+
     public BookingResponse approve(String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
@@ -333,6 +442,75 @@ public class BookingService {
         return resourceRepository.findById(booking.getResourceId())
                 .map(Resource::getName)
                 .orElse("Unknown Resource");
+    }
+
+    public List<ResourceAvailabilityResponse> getResourceAvailability() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Booking> approvedBookings = bookingRepository.findByStatus(Booking.BookingStatus.APPROVED);
+        List<Booking> pendingBookings = bookingRepository.findByStatus(Booking.BookingStatus.PENDING);
+
+        List<Booking> relevantBookings = approvedBookings.stream()
+                .filter(booking -> !LocalDateTime.of(booking.getDate(), booking.getEndTime()).isBefore(now))
+                .collect(Collectors.toList());
+        relevantBookings.addAll(
+                pendingBookings.stream()
+                        .filter(booking -> !LocalDateTime.of(booking.getDate(), booking.getEndTime()).isBefore(now))
+                        .collect(Collectors.toList())
+        );
+
+        Map<String, Booking> currentlyBookedByResource = new HashMap<>();
+        Map<String, Booking> nextBookingByResource = new HashMap<>();
+
+        for (Booking booking : relevantBookings) {
+            LocalDateTime startAt = LocalDateTime.of(booking.getDate(), booking.getStartTime());
+            LocalDateTime endAt = LocalDateTime.of(booking.getDate(), booking.getEndTime());
+
+            if (!now.isBefore(startAt) && now.isBefore(endAt)) {
+                Booking current = currentlyBookedByResource.get(booking.getResourceId());
+                if (current == null ||
+                        endAt.isAfter(LocalDateTime.of(current.getDate(), current.getEndTime()))) {
+                    currentlyBookedByResource.put(booking.getResourceId(), booking);
+                }
+                continue;
+            }
+
+            if (startAt.isAfter(now)) {
+                Booking next = nextBookingByResource.get(booking.getResourceId());
+                if (next == null ||
+                        startAt.isBefore(LocalDateTime.of(next.getDate(), next.getStartTime()))) {
+                    nextBookingByResource.put(booking.getResourceId(), booking);
+                }
+            }
+        }
+
+        return resourceRepository.findAll().stream()
+                .map(resource -> {
+                    Booking current = currentlyBookedByResource.get(resource.getId());
+                    if (current != null) {
+                        return ResourceAvailabilityResponse.builder()
+                                .resourceId(resource.getId())
+                                .status("CURRENTLY_BOOKED")
+                                .availableAfter(LocalDateTime.of(current.getDate(), current.getEndTime()).toString())
+                                .build();
+                    }
+
+                    Booking next = nextBookingByResource.get(resource.getId());
+                    if (next != null) {
+                        return ResourceAvailabilityResponse.builder()
+                                .resourceId(resource.getId())
+                                .status("AVAILABLE_AFTER")
+                                .availableAfter(LocalDateTime.of(next.getDate(), next.getStartTime()).toString())
+                                .build();
+                    }
+
+                    return ResourceAvailabilityResponse.builder()
+                            .resourceId(resource.getId())
+                            .status("AVAILABLE_NOW")
+                            .availableAfter(null)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     private BookingResponse toResponse(Booking booking) {

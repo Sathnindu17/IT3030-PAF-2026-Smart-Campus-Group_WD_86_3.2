@@ -8,7 +8,6 @@ export default function BookingForm() {
 
   const CUSTOM_RESOURCE = "CUSTOM_RESOURCE";
   const preselectedResource = searchParams.get("resourceId") || "";
-
   const today = new Date().toISOString().split("T")[0];
 
   const [resources, setResources] = useState([]);
@@ -27,6 +26,9 @@ export default function BookingForm() {
 
   const [availability, setAvailability] = useState(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  const [suggestions, setSuggestions] = useState(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -47,14 +49,9 @@ export default function BookingForm() {
 
       try {
         const res = await resourcesAPI.getAll({ status: "ACTIVE" });
-
         const payload = res?.data;
         const resourceList =
-          payload?.data ||
-          payload?.content ||
-          payload?.resources ||
-          payload ||
-          [];
+          payload?.data || payload?.content || payload?.resources || payload || [];
 
         if (!Array.isArray(resourceList)) {
           throw new Error("Invalid resources response");
@@ -66,7 +63,7 @@ export default function BookingForm() {
         setResources([]);
         setResourcesError(
           err?.response?.data?.message ||
-          "Failed to load resources. Please check backend authorization."
+            "Failed to load resources. Please check backend authorization."
         );
       } finally {
         setResourcesLoading(false);
@@ -83,6 +80,45 @@ export default function BookingForm() {
 
     return () => clearTimeout(timer);
   }, [form.resourceId, form.resourceName, form.date, form.startTime, form.endTime]);
+
+  useEffect(() => {
+    const hasCoreFields =
+      form.resourceId &&
+      form.resourceId !== CUSTOM_RESOURCE &&
+      form.date &&
+      form.startTime &&
+      form.endTime;
+
+    if (!hasCoreFields) {
+      setSuggestions(null);
+      return;
+    }
+
+    let isCancelled = false;
+    setSuggestionsLoading(true);
+
+    bookingsAPI
+      .getSuggestions({
+        resourceId: form.resourceId,
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        expectedAttendees: form.expectedAttendees,
+      })
+      .then((res) => {
+        if (!isCancelled) setSuggestions(res?.data?.data || null);
+      })
+      .catch(() => {
+        if (!isCancelled) setSuggestions(null);
+      })
+      .finally(() => {
+        if (!isCancelled) setSuggestionsLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [form.resourceId, form.date, form.startTime, form.endTime, form.expectedAttendees]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -216,8 +252,8 @@ export default function BookingForm() {
       console.error("Booking create failed:", err);
       setError(
         err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        "Failed to create booking"
+          err?.response?.data?.error ||
+          "Failed to create booking"
       );
     } finally {
       setLoading(false);
@@ -284,9 +320,7 @@ export default function BookingForm() {
       >
         <div className="card">
           <div className="card-body">
-            <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
-              Booking Details
-            </h3>
+            <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Details</h3>
 
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -306,15 +340,13 @@ export default function BookingForm() {
                     const id = r.id || r._id;
                     return (
                       <option key={id} value={id}>
-                        {r.name} ({String(r.type || "").replace(/_/g, " ")}) -{" "}
+                        {r.name} ({String(r.type || "").replace(/_/g, " ")}) - {" "}
                         {r.location}
                       </option>
                     );
                   })}
 
-                  <option value={CUSTOM_RESOURCE}>
-                    Other / Add my own resource
-                  </option>
+                  <option value={CUSTOM_RESOURCE}>Other / Add my own resource</option>
                 </select>
               </div>
 
@@ -345,9 +377,7 @@ export default function BookingForm() {
                     onChange={handleChange}
                     required
                   />
-                  <small style={{ color: "#6b7280" }}>
-                    Past dates are not allowed.
-                  </small>
+                  <small style={{ color: "#6b7280" }}>Past dates are not allowed.</small>
                 </div>
 
                 <div className="form-group">
@@ -424,6 +454,114 @@ export default function BookingForm() {
                 </div>
               )}
 
+              {suggestionsLoading && !isCustomResource && (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    padding: 10,
+                    borderRadius: 8,
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    color: "#475569",
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  Checking smart availability suggestions...
+                </div>
+              )}
+
+              {!suggestionsLoading && suggestions && !isCustomResource && (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    padding: 12,
+                    borderRadius: 10,
+                    border: suggestions.hasConflict
+                      ? "1px solid #fca5a5"
+                      : "1px solid #86efac",
+                    background: suggestions.hasConflict ? "#fff1f2" : "#f0fdf4",
+                  }}
+                >
+                  <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Smart Suggestions</h4>
+                  <p style={{ margin: "0 0 10px", fontSize: 13, color: "#334155" }}>
+                    {suggestions.message}
+                  </p>
+
+                  {suggestions.hasConflict &&
+                    suggestions.nextAvailableStartTime &&
+                    suggestions.suggestedEndTime && (
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 10,
+                          flexWrap: "wrap",
+                          marginBottom: suggestions.alternatives?.length ? 10 : 0,
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: "#334155" }}>
+                          <strong>{suggestions.requestedResourceName}</strong>
+                          <div>
+                            Next free slot: {suggestions.nextAvailableStartTime} - {" "}
+                            {suggestions.suggestedEndTime}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              startTime: suggestions.nextAvailableStartTime,
+                              endTime: suggestions.suggestedEndTime,
+                            }))
+                          }
+                        >
+                          Use This Time
+                        </button>
+                      </div>
+                    )}
+
+                  {suggestions.alternatives?.length > 0 && (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {suggestions.alternatives.map((alt) => (
+                        <div
+                          key={alt.resourceId}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: 8,
+                            borderRadius: 8,
+                            background: "#fff",
+                            border: "1px solid #e2e8f0",
+                          }}
+                        >
+                          <div style={{ fontSize: 12, color: "#334155" }}>
+                            <strong>{alt.resourceName}</strong>
+                            <div>
+                              {alt.resourceType?.replace(/_/g, " ")} - {alt.location} - cap {alt.capacity}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            onClick={() =>
+                              setForm((prev) => ({ ...prev, resourceId: alt.resourceId }))
+                            }
+                          >
+                            Use Resource
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="form-group">
                 <label>Purpose</label>
                 <textarea
@@ -454,9 +592,7 @@ export default function BookingForm() {
 
         <div className="card" style={{ height: "fit-content" }}>
           <div className="card-body">
-            <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
-              Booking Summary
-            </h3>
+            <h3 style={{ marginTop: 0, marginBottom: "20px" }}>Booking Summary</h3>
 
             <p>
               <strong>Resource:</strong> {selectedResourceName || "-"}

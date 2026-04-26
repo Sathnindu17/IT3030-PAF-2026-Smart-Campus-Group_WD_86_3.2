@@ -69,6 +69,8 @@ export const authAPI = {
 
 export const resourcesAPI = {
   getAll: (params) => api.get("/resources", { params }),
+  recommend: (params) => api.get("/resources/recommendations", { params }),
+  getMapAvailability: (params) => api.get("/resources/map-availability", { params }),
   getById: (id) => api.get(`/resources/${id}`),
   create: (data) => api.post("/resources", data),
   update: (id, data) => api.put(`/resources/${id}`, data),
@@ -79,6 +81,7 @@ export const bookingsAPI = {
   create: (data) => api.post("/bookings", data),
   getMyBookings: (params) => api.get("/bookings/my", { params }),
   getAllBookings: (params) => api.get("/bookings/admin/all", { params }),
+  getSuggestions: (params) => api.get("/bookings/suggestions", { params }),
   approve: (id) => api.patch(`/bookings/${id}/approve`),
   reject: (id, reason) => api.patch(`/bookings/${id}/reject`, { reason }),
   cancel: (id) => api.patch(`/bookings/${id}/cancel`),

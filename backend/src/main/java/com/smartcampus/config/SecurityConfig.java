@@ -32,11 +32,11 @@ public class SecurityConfig {
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/hello").permitAll()
 
-                // Resource management - admin only for CUD
-                .requestMatchers(HttpMethod.POST, "/api/resources").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/resources/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/resources/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/resources/**").authenticated()
+                // Resource management - create/read/update/delete public
+                .requestMatchers(HttpMethod.POST, "/api/resources").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/resources/**").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/resources/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
 
                 // Bookings
                 .requestMatchers(HttpMethod.POST, "/api/bookings").authenticated()

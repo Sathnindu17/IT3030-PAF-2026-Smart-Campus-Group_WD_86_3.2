@@ -17,6 +17,7 @@ import TechnicianTickets from './pages/tickets/TechnicianTickets';
 import TicketDetail from './pages/tickets/TicketDetail';
 import NotificationsPage from './pages/NotificationsPage';
 import NotificationPreferences from './pages/NotificationPreferences';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
@@ -27,7 +28,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<LandingPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

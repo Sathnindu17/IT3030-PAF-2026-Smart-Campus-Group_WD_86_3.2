@@ -9,22 +9,18 @@ export default function LandingPage() {
       <nav className="landing-nav">
         <div className="logo">🏫 Smart Campus Hub</div>
         <div style={{ display: 'flex', gap: 12 }}>
-          {isAuthenticated ? (
-            <Link to="/app" className="btn btn-primary">Go to Dashboard</Link>
-          ) : (
-            <>
-              <Link to="/login" className="btn btn-secondary">Login</Link>
-              <Link to="/register" className="btn btn-primary">Get Started</Link>
-            </>
+          {!isAuthenticated && (
+            <Link to="/login" className="btn btn-secondary">Login</Link>
           )}
+          <Link to="/app/dashboard" className="btn btn-primary">Go to Dashboard</Link>
         </div>
       </nav>
 
       <div className="landing-hero">
         <h1>Smart Campus<br />Operations Hub</h1>
         <p>Streamline your university's resource management, bookings, and maintenance — all in one simple platform.</p>
-        <Link to={isAuthenticated ? '/app' : '/register'} className="btn btn-primary" style={{ padding: '14px 36px', fontSize: 16 }}>
-          {isAuthenticated ? 'Open Dashboard' : 'Get Started Free'}
+        <Link to="/app/dashboard" className="btn btn-primary" style={{ padding: '14px 36px', fontSize: 16 }}>
+          Go to Dashboard
         </Link>
 
         <div className="landing-features">

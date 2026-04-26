@@ -130,12 +130,17 @@ body.dark-mode {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
+  margin-bottom: 6px;
   border-radius: var(--radius);
   color: var(--gray-300);
   font-size: 14px;
   font-weight: 500;
   transition: var(--transition);
   cursor: pointer;
+}
+
+.sidebar-section .sidebar-link:last-child {
+  margin-bottom: 0;
 }
 
 .sidebar-link:hover {

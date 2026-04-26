@@ -11,12 +11,46 @@ export default function BookingForm() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [suggestions, setSuggestions] = useState(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     resourcesAPI.getAll({ status: 'ACTIVE' }).then(res => setResources(res.data.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const hasCoreFields = form.resourceId && form.date && form.startTime && form.endTime;
+    if (!hasCoreFields) {
+      setSuggestions(null);
+      return;
+    }
+
+    let isCancelled = false;
+    setSuggestionsLoading(true);
+
+    bookingsAPI.getSuggestions({
+      resourceId: form.resourceId,
+      date: form.date,
+      startTime: form.startTime,
+      endTime: form.endTime,
+      expectedAttendees: form.expectedAttendees,
+    })
+      .then((res) => {
+        if (!isCancelled) setSuggestions(res.data.data);
+      })
+      .catch(() => {
+        if (!isCancelled) setSuggestions(null);
+      })
+      .finally(() => {
+        if (!isCancelled) setSuggestionsLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [form.resourceId, form.date, form.startTime, form.endTime, form.expectedAttendees]);
 
   const handleChange = (e) => {
     const value = e.target.name === 'expectedAttendees' ? parseInt(e.target.value) || 0 : e.target.value;
@@ -70,6 +104,62 @@ export default function BookingForm() {
                 <input type="time" name="endTime" className="form-control" value={form.endTime} onChange={handleChange} required />
               </div>
             </div>
+
+            {suggestionsLoading && (
+              <div className="booking-suggestion-card">
+                <p className="booking-suggestion-muted">Checking smart availability suggestions...</p>
+              </div>
+            )}
+
+            {!suggestionsLoading && suggestions && (
+              <div className={`booking-suggestion-card ${suggestions.hasConflict ? 'booking-suggestion-warning' : 'booking-suggestion-ok'}`}>
+                <h4>Smart Suggestions</h4>
+                <p>{suggestions.message}</p>
+
+                {suggestions.hasConflict && suggestions.nextAvailableStartTime && suggestions.suggestedEndTime && (
+                  <div className="booking-suggestion-block">
+                    <div>
+                      <strong>{suggestions.requestedResourceName}</strong>
+                      <span>
+                        Next free slot: {suggestions.nextAvailableStartTime} - {suggestions.suggestedEndTime}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setForm(prev => ({
+                        ...prev,
+                        startTime: suggestions.nextAvailableStartTime,
+                        endTime: suggestions.suggestedEndTime,
+                      }))}
+                    >
+                      Use This Time
+                    </button>
+                  </div>
+                )}
+
+                {suggestions.alternatives?.length > 0 && (
+                  <div className="booking-suggestion-list">
+                    {suggestions.alternatives.map((alt) => (
+                      <div key={alt.resourceId} className="booking-suggestion-item">
+                        <div>
+                          <strong>{alt.resourceName}</strong>
+                          <span>{alt.resourceType?.replace(/_/g, ' ')} - {alt.location} - cap {alt.capacity}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline"
+                          onClick={() => setForm(prev => ({ ...prev, resourceId: alt.resourceId }))}
+                        >
+                          Use Resource
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="form-group">
               <label>Purpose</label>
               <textarea name="purpose" className="form-control" value={form.purpose} onChange={handleChange} required placeholder="Describe the purpose of booking" />

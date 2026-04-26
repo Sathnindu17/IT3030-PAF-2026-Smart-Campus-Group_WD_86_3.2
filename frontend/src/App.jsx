@@ -45,7 +45,7 @@ function App() {
             <Route
               path="resources/new"
               element={
-                <ProtectedRoute roles={['ADMIN']}>
+                <ProtectedRoute>
                   <ResourceForm />
                 </ProtectedRoute>
               }
@@ -53,7 +53,7 @@ function App() {
             <Route
               path="resources/edit/:id"
               element={
-                <ProtectedRoute roles={['ADMIN']}>
+                <ProtectedRoute>
                   <ResourceForm />
                 </ProtectedRoute>
               }

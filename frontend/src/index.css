@@ -750,6 +750,77 @@ textarea.form-control {
   gap: 16px;
 }
 
+.booking-suggestion-card {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 14px;
+  background: #f8fbff;
+}
+
+.booking-suggestion-card h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.booking-suggestion-card p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.booking-suggestion-ok {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.booking-suggestion-warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.booking-suggestion-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.booking-suggestion-block,
+.booking-suggestion-item {
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.booking-suggestion-block {
+  margin-bottom: 10px;
+}
+
+.booking-suggestion-block strong,
+.booking-suggestion-item strong {
+  display: block;
+  font-size: 13px;
+  color: var(--gray-800);
+}
+
+.booking-suggestion-block span,
+.booking-suggestion-item span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.booking-suggestion-list {
+  display: grid;
+  gap: 8px;
+}
+
 .form-error {
   color: var(--danger);
   font-size: 12px;
@@ -1381,6 +1452,8 @@ tr:hover {
   .summary-grid {
     grid-template-columns: 1fr;
   }
+  .booking-suggestion-block,
+  .booking-suggestion-item { align-items: flex-start; flex-direction: column; }
 
   .tool-row {
     width: 100%;

@@ -7,7 +7,7 @@ export default function ResourceForm() {
   const isEdit = !!id;
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    name: '', type: 'LECTURE_HALL', capacity: 1, location: '', status: 'ACTIVE', description: ''
+    name: '', type: 'LECTURE_HALL', capacity: 1, location: '', status: 'ACTIVE', description: '', equipmentText: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,15 @@ export default function ResourceForm() {
     if (isEdit) {
       resourcesAPI.getById(id).then(res => {
         const r = res.data.data;
-        setForm({ name: r.name, type: r.type, capacity: r.capacity, location: r.location, status: r.status, description: r.description || '' });
+        setForm({
+          name: r.name,
+          type: r.type,
+          capacity: r.capacity,
+          location: r.location,
+          status: r.status,
+          description: r.description || '',
+          equipmentText: (r.equipment || []).join(', ')
+        });
       }).catch(() => navigate('/app/resources'));
     }
   }, [id]);
@@ -31,14 +39,33 @@ export default function ResourceForm() {
     setError('');
     setLoading(true);
     try {
+      const payload = {
+        ...form,
+        equipment: form.equipmentText
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean)
+      };
+
       if (isEdit) {
-        await resourcesAPI.update(id, form);
+        await resourcesAPI.update(id, payload);
       } else {
-        await resourcesAPI.create(form);
+        await resourcesAPI.create(payload);
       }
       navigate('/app/resources');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save resource');
+      const apiMessage = err.response?.data?.message;
+      const status = err.response?.status;
+
+      if (apiMessage) {
+        setError(apiMessage);
+      } else if (status === 403) {
+        setError('You do not have permission to perform this action.');
+      } else if (status === 400) {
+        setError('Invalid resource data. Please check all fields and try again.');
+      } else {
+        setError('Failed to save resource');
+      }
     } finally {
       setLoading(false);
     }
@@ -79,6 +106,7 @@ export default function ResourceForm() {
                 <label>Status</label>
                 <select name="status" className="form-control" value={form.status} onChange={handleChange}>
                   <option value="ACTIVE">Active</option>
+                  <option value="UNDER_RENOVATION">Under Renovation</option>
                   <option value="OUT_OF_SERVICE">Out of Service</option>
                 </select>
               </div>
@@ -86,6 +114,16 @@ export default function ResourceForm() {
             <div className="form-group">
               <label>Description</label>
               <textarea name="description" className="form-control" value={form.description} onChange={handleChange} placeholder="Optional description" />
+            </div>
+            <div className="form-group">
+              <label>Equipment (comma separated)</label>
+              <input
+                name="equipmentText"
+                className="form-control"
+                value={form.equipmentText}
+                onChange={handleChange}
+                placeholder="e.g. Projector, 40 PCs, Smart Board"
+              />
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button type="submit" className="btn btn-primary" disabled={loading}>

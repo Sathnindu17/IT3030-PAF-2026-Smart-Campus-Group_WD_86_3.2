@@ -1,6 +1,7 @@
 package com.smartcampus.modules.bookings.controller;
 
 import com.smartcampus.common.dto.ApiResponse;
+import com.smartcampus.modules.bookings.dto.BookingSuggestionResponse;
 import com.smartcampus.modules.bookings.dto.BookingRequest;
 import com.smartcampus.modules.bookings.dto.BookingResponse;
 import com.smartcampus.modules.bookings.dto.RejectRequest;
@@ -44,6 +45,23 @@ public class BookingController {
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String resourceId) {
         List<BookingResponse> response = bookingService.getAllBookings(status, date, resourceId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<ApiResponse<BookingSuggestionResponse>> getSuggestions(
+            @RequestParam String resourceId,
+            @RequestParam String date,
+            @RequestParam String startTime,
+            @RequestParam String endTime,
+            @RequestParam(required = false) Integer expectedAttendees) {
+        BookingSuggestionResponse response = bookingService.getSuggestions(
+                resourceId,
+                date,
+                startTime,
+                endTime,
+                expectedAttendees
+        );
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

@@ -82,7 +82,10 @@ export default function ResourceList() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h2>Resources & Facilities</h2>
-        <button onClick={() => navigate('/app/resources/new')} className="btn btn-primary">+ Add Resource</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => navigate('/app/resources/map')} className="btn btn-secondary">Campus Map</button>
+          <button onClick={() => navigate('/app/resources/new')} className="btn btn-primary">+ Add Resource</button>
+        </div>
       </div>
 
       <div className="filters">
@@ -101,7 +104,38 @@ export default function ResourceList() {
         </select>
       </div>
 
-      <div className="card" style={{ marginBottom: 24 }}>
+      {resources.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">🏢</div>
+          <p>No resources found</p>
+        </div>
+      ) : (
+        <div className="resource-grid">
+          {resources.map(r => (
+            <div key={r.id} className="resource-card">
+              <h3>{r.name}</h3>
+              <div className="resource-meta">
+                <span className={`badge badge-${r.status?.toLowerCase()}`}>{r.status}</span>
+                <span className="badge" style={{ background: '#e0e7ff', color: '#3730a3' }}>{typeLabel(r.type)}</span>
+                <span className="badge" style={{ background: '#f3f4f6', color: '#374151' }}>👥 {r.capacity}</span>
+              </div>
+              <div className="resource-desc">📍 {r.location}</div>
+              {r.equipment?.length > 0 && <div className="resource-desc">🧰 {r.equipment.join(', ')}</div>}
+              {r.description && <div className="resource-desc">{r.description}</div>}
+              <div className="resource-actions">
+                <button onClick={() => navigate(`/app/bookings/new?resourceId=${r.id}`)}
+                  className="btn btn-sm btn-primary">Book</button>
+                <button onClick={() => navigate(`/app/resources/edit/${r.id}`)}
+                  className="btn btn-sm btn-primary">Edit</button>
+                <button onClick={() => handleDelete(r.id)}
+                  className="btn btn-sm btn-primary">Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card" style={{ marginTop: 24 }}>
         <div className="card-body">
           <h3 style={{ marginBottom: 12 }}>Smart Resource Recommendation</h3>
           <p style={{ marginTop: 0, color: '#6b7280' }}>Example: Best lab available for 40 students.</p>
@@ -193,7 +227,7 @@ export default function ResourceList() {
             <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
               {recommendations.map((r, index) => (
                 <div key={r.resourceId} style={{ border: '1px solid #dbeafe', borderRadius: 10, padding: 12, background: index === 0 ? '#eff6ff' : '#fff' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
                     <div>
                       <strong>{index === 0 ? 'Best Match: ' : ''}{r.resourceName}</strong>
                       <div style={{ color: '#6b7280', fontSize: 13 }}>
@@ -206,12 +240,6 @@ export default function ResourceList() {
                       )}
                       <div style={{ color: '#4b5563', fontSize: 13 }}>{r.reason}</div>
                     </div>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => navigate(`/app/bookings/new?resourceId=${r.resourceId}`)}
-                    >
-                      Book
-                    </button>
                   </div>
                 </div>
               ))}
@@ -219,37 +247,6 @@ export default function ResourceList() {
           )}
         </div>
       </div>
-
-      {resources.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🏢</div>
-          <p>No resources found</p>
-        </div>
-      ) : (
-        <div className="resource-grid">
-          {resources.map(r => (
-            <div key={r.id} className="resource-card">
-              <h3>{r.name}</h3>
-              <div className="resource-meta">
-                <span className={`badge badge-${r.status?.toLowerCase()}`}>{r.status}</span>
-                <span className="badge" style={{ background: '#e0e7ff', color: '#3730a3' }}>{typeLabel(r.type)}</span>
-                <span className="badge" style={{ background: '#f3f4f6', color: '#374151' }}>👥 {r.capacity}</span>
-              </div>
-              <div className="resource-desc">📍 {r.location}</div>
-              {r.equipment?.length > 0 && <div className="resource-desc">🧰 {r.equipment.join(', ')}</div>}
-              {r.description && <div className="resource-desc">{r.description}</div>}
-              <div className="resource-actions">
-                <button onClick={() => navigate(`/app/bookings/new?resourceId=${r.id}`)}
-                  className="btn btn-sm btn-primary">Book</button>
-                <button onClick={() => navigate(`/app/resources/edit/${r.id}`)}
-                  className="btn btn-sm btn-primary">Edit</button>
-                <button onClick={() => handleDelete(r.id)}
-                  className="btn btn-sm btn-primary">Delete</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

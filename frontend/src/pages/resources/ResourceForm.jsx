@@ -2,6 +2,28 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { resourcesAPI } from '../../api/axios';
 
+const KNOWN_SLIIT_LOCATION_KEYWORDS = [
+  'a block', 'block a',
+  'b block', 'block b',
+  'c block', 'block c',
+  'd block', 'block d',
+  'e block', 'block e',
+  'f block', 'block f',
+  'g block', 'block g',
+  'h block', 'block h',
+  'new building', 'new block',
+  'library',
+  'main hall', 'auditorium',
+  'lab complex', 'labs',
+  'car park', 'parking',
+];
+
+const isKnownSliitLocation = (location) => {
+  const normalized = (location || '').toLowerCase().trim();
+  if (!normalized) return false;
+  return KNOWN_SLIIT_LOCATION_KEYWORDS.some((keyword) => normalized.includes(keyword));
+};
+
 export default function ResourceForm() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -37,6 +59,12 @@ export default function ResourceForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!isKnownSliitLocation(form.location)) {
+      setError('Location must be a known SLIIT campus place (e.g. A Block, B Block, Library, Main Hall, New Building).');
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -100,7 +128,10 @@ export default function ResourceForm() {
             <div className="form-row">
               <div className="form-group">
                 <label>Location</label>
-                <input name="location" className="form-control" value={form.location} onChange={handleChange} required placeholder="e.g. Building A, Floor 2" />
+                <input name="location" className="form-control" value={form.location} onChange={handleChange} required placeholder="e.g. SLIIT A Block, Floor 2" />
+                {form.location && !isKnownSliitLocation(form.location) && (
+                  <div className="form-error">Use a known SLIIT location such as A Block, B Block, Library, Main Hall, New Building.</div>
+                )}
               </div>
               <div className="form-group">
                 <label>Status</label>

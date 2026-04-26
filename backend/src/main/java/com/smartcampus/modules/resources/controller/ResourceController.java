@@ -1,6 +1,7 @@
 package com.smartcampus.modules.resources.controller;
 
 import com.smartcampus.common.dto.ApiResponse;
+import com.smartcampus.modules.resources.dto.ResourceMapAvailabilityResponse;
 import com.smartcampus.modules.resources.dto.ResourceRecommendationResponse;
 import com.smartcampus.modules.resources.dto.ResourceRequest;
 import com.smartcampus.modules.resources.dto.ResourceResponse;
@@ -39,7 +40,7 @@ public class ResourceController {
         return ResponseEntity.ok(ApiResponse.success("Resource deleted", null));
     }
 
-    @GetMapping("/{id:^(?!recommendations$).+}")
+    @GetMapping("/{id:^(?!(recommendations|map-availability)$).+}")
     public ResponseEntity<ApiResponse<ResourceResponse>> getById(@PathVariable String id) {
         ResourceResponse response = resourceService.getById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -73,6 +74,15 @@ public class ResourceController {
                 startTime,
                 endTime
         );
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/map-availability")
+    public ResponseEntity<ApiResponse<List<ResourceMapAvailabilityResponse>>> mapAvailability(
+            @RequestParam String date,
+            @RequestParam String startTime,
+            @RequestParam String endTime) {
+        List<ResourceMapAvailabilityResponse> response = resourceService.getMapAvailability(date, startTime, endTime);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

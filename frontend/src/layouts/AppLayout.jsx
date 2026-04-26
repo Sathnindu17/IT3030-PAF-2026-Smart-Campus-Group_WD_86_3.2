@@ -31,6 +31,9 @@ export default function AppLayout() {
             <NavLink to="/app/resources" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               <span className="icon">🏢</span> Resources
             </NavLink>
+            <NavLink to="/app/resources/map" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <span className="icon">🗺️</span> Campus Map
+            </NavLink>
           </div>
 
           <div className="sidebar-section">

@@ -3,6 +3,7 @@ package com.smartcampus.modules.resources.service;
 import com.smartcampus.common.exception.BadRequestException;
 import com.smartcampus.common.exception.ResourceNotFoundException;
 import com.smartcampus.modules.bookings.repository.BookingRepository;
+import com.smartcampus.modules.resources.dto.ResourceMapAvailabilityResponse;
 import com.smartcampus.modules.resources.dto.ResourceRequest;
 import com.smartcampus.modules.resources.dto.ResourceRecommendationResponse;
 import com.smartcampus.modules.resources.dto.ResourceResponse;
@@ -27,6 +28,22 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ResourceService {
 
+    private static final List<String> KNOWN_SLIIT_LOCATION_KEYWORDS = List.of(
+            "a block", "block a",
+            "b block", "block b",
+            "c block", "block c",
+            "d block", "block d",
+            "e block", "block e",
+            "f block", "block f",
+            "g block", "block g",
+            "h block", "block h",
+            "new building", "new block",
+            "library",
+            "main hall", "auditorium",
+            "lab complex", "labs",
+            "car park", "parking"
+    );
+
     private final ResourceRepository resourceRepository;
     private final BookingRepository bookingRepository;
 
@@ -35,7 +52,7 @@ public class ResourceService {
                 .name(request.getName())
                 .type(parseType(request.getType()))
                 .capacity(request.getCapacity())
-                .location(request.getLocation())
+                .location(validateCampusLocation(request.getLocation()))
                 .status(parseStatus(request.getStatus()))
                 .description(request.getDescription())
                 .equipment(cleanEquipment(request.getEquipment()))
@@ -54,7 +71,7 @@ public class ResourceService {
         resource.setName(request.getName());
         resource.setType(parseType(request.getType()));
         resource.setCapacity(request.getCapacity());
-        resource.setLocation(request.getLocation());
+        resource.setLocation(validateCampusLocation(request.getLocation()));
         resource.setStatus(parseStatus(request.getStatus()));
         resource.setDescription(request.getDescription());
         resource.setEquipment(cleanEquipment(request.getEquipment()));
@@ -95,6 +112,34 @@ public class ResourceService {
         }
 
         return resources.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    public List<ResourceMapAvailabilityResponse> getMapAvailability(String date, String startTime, String endTime) {
+        if (date == null || startTime == null || endTime == null) {
+            throw new BadRequestException("date, startTime and endTime are required");
+        }
+
+        LocalDate targetDate;
+        LocalTime targetStart;
+        LocalTime targetEnd;
+        try {
+            targetDate = LocalDate.parse(date);
+            targetStart = LocalTime.parse(startTime);
+            targetEnd = LocalTime.parse(endTime);
+        } catch (DateTimeParseException ex) {
+            throw new BadRequestException("Invalid date/time format. Use date=yyyy-MM-dd and time=HH:mm");
+        }
+
+        if (!targetEnd.isAfter(targetStart)) {
+            throw new BadRequestException("End time must be after start time");
+        }
+
+        return resourceRepository.findAll().stream()
+                .map(resource -> ResourceMapAvailabilityResponse.builder()
+                        .resourceId(resource.getId())
+                        .available(isAvailable(resource.getId(), targetDate, targetStart, targetEnd))
+                        .build())
+                .collect(Collectors.toList());
     }
 
     public List<ResourceRecommendationResponse> recommend(Integer attendees,
@@ -282,5 +327,22 @@ public class ResourceService {
             return 12;
         }
         return 0;
+    }
+
+    private String validateCampusLocation(String location) {
+        if (location == null || location.isBlank()) {
+            throw new BadRequestException("Location is required");
+        }
+
+        String normalized = location.toLowerCase(Locale.ROOT).trim();
+        boolean known = KNOWN_SLIIT_LOCATION_KEYWORDS.stream().anyMatch(normalized::contains);
+
+        if (!known) {
+            throw new BadRequestException(
+                    "Location must be a known SLIIT campus place (e.g. A Block, B Block, Library, Main Hall, New Building)."
+            );
+        }
+
+        return location.trim();
     }
 }

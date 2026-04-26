@@ -39,6 +39,7 @@ export const authAPI = {
 export const resourcesAPI = {
   getAll: (params) => api.get('/resources', { params }),
   recommend: (params) => api.get('/resources/recommendations', { params }),
+  getMapAvailability: (params) => api.get('/resources/map-availability', { params }),
   getById: (id) => api.get(`/resources/${id}`),
   create: (data) => api.post('/resources', data),
   update: (id, data) => api.put(`/resources/${id}`, data),

@@ -5,6 +5,7 @@ import AppLayout from './layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
 import ResourceList from './pages/resources/ResourceList';
 import ResourceForm from './pages/resources/ResourceForm';
+import CampusMapView from './pages/resources/CampusMapView';
 import BookingForm from './pages/bookings/BookingForm';
 import MyBookings from './pages/bookings/MyBookings';
 import AdminBookings from './pages/bookings/AdminBookings';
@@ -33,6 +34,7 @@ function App() {
           <Route path="/app" element={<AppLayout />}>
             <Route index element={<Navigate to="resources" replace />} />
             <Route path="resources" element={<ResourceList />} />
+            <Route path="resources/map" element={<CampusMapView />} />
 
             <Route
               path="dashboard"

@@ -244,6 +244,17 @@ body.dark-mode {
   font-size: 1.35rem;
 }
 
+.campus-map-wrap {
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.campus-map-canvas {
+  width: 100%;
+  height: 520px;
+}
+
 .panel-grid {
   display: grid;
   grid-template-columns: 360px 1fr;

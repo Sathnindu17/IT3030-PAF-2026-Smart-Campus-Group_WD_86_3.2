@@ -25,7 +25,7 @@ export default function AppLayout() {
         <nav className="sidebar-nav">
           <div className="sidebar-section">
             <div className="sidebar-section-title">Main</div>
-            <NavLink to="/app" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/app/dashboard" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               <span className="icon">📊</span> Dashboard
             </NavLink>
             <NavLink to="/app/resources" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>

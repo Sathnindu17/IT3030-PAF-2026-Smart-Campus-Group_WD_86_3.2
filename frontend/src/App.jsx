@@ -43,7 +43,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="resources" replace />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="resources/map" element={<CampusMapView />} />
 
             <Route

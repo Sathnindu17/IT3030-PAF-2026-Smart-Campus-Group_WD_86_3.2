@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
 
@@ -22,18 +22,18 @@ export default function AppLayout() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
+        <Link to="/" className="sidebar-header sidebar-brand-link" aria-label="Go to home page">
           <h2>🏫 Smart Campus</h2>
           <p>Operations Hub</p>
-        </div>
+        </Link>
 
         <nav className="sidebar-nav">
           <div className="sidebar-section">
             <div className="sidebar-section-title">Main</div>
-            <NavLink to="/app/dashboard" onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/app/dashboard" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               <span className="icon">📊</span> Dashboard
             </NavLink>
-            <NavLink to="/app/resources" onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/app/resources" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               <span className="icon">🏢</span> Resources
             </NavLink>
             <NavLink to="/app/resources/map" onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>

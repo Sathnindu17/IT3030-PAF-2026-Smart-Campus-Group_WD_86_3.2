@@ -17,6 +17,7 @@ import TechnicianTickets from './pages/tickets/TechnicianTickets';
 import TicketDetail from './pages/tickets/TicketDetail';
 import NotificationsPage from './pages/NotificationsPage';
 import NotificationPreferences from './pages/NotificationPreferences';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
@@ -27,17 +28,33 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
+          <Route path="/" element={<LandingPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/auth/login" element={<Navigate to="/login" replace />} />
+          <Route path="/auth/register" element={<Navigate to="/register" replace />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          <Route path="/app" element={<AppLayout />}>
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="resources" element={<ResourceList />} />
             <Route path="resources/map" element={<CampusMapView />} />
 
+            <Route
+              path="resources"
+              element={
+                <ProtectedRoute>
+                  <ResourceList />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="dashboard"
               element={
@@ -49,7 +66,7 @@ function App() {
             <Route
               path="resources/new"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute roles={['ADMIN']}>
                   <ResourceForm />
                 </ProtectedRoute>
               }
@@ -57,7 +74,7 @@ function App() {
             <Route
               path="resources/edit/:id"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute roles={['ADMIN']}>
                   <ResourceForm />
                 </ProtectedRoute>
               }

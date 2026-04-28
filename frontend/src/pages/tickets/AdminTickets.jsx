@@ -40,6 +40,7 @@ export default function AdminTickets() {
       setAssignModal({ open: false, ticketId: null, techId: '' });
       setFeedback({ type: 'success', message: 'Technician assigned successfully.' });
       fetchData();
+      window.dispatchEvent(new Event('notifications-updated'));
     } catch (e) { setFeedback({ type: 'error', message: e.response?.data?.message || 'Failed to assign technician.' }); }
   };
 
@@ -286,7 +287,15 @@ export default function AdminTickets() {
                         </span>
                       )}
                     </td>
-                    <td style={tableCellStyle}>{t.assignedTechnicianName || <span style={{ color: '#9ca3af' }}>Unassigned</span>}</td>
+                    <td style={tableCellStyle}>
+                      {t.assignedTechnicianName ? (
+                        <span style={{ fontWeight: 500 }}>{t.assignedTechnicianName}</span>
+                      ) : t.assignedTechnicianId ? (
+                        <span style={{ color: '#f59e0b', fontSize: 12 }}>⚠ ID: {t.assignedTechnicianId.substring(0, 8)}...</span>
+                      ) : (
+                        <span style={{ color: '#9ca3af' }}>Unassigned</span>
+                      )}
+                    </td>
                     <td style={tableCellStyle}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button onClick={() => setAssignModal({ open: true, ticketId: t.id, techId: '' })} className="btn btn-sm btn-secondary">Assign</button>

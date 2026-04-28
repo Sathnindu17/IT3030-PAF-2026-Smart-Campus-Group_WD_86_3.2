@@ -516,7 +516,6 @@ public class BookingService {
                 .map(Resource::getName)
                 .orElse("Unknown Resource");
     }
-
     private BookingResponse toResponse(Booking booking) {
         String userName = userRepository.findById(booking.getUserId())
                 .map(User::getFullName)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { resourcesAPI } from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 
 const KNOWN_SLIIT_LOCATION_KEYWORDS = [
   'a block', 'block a',
@@ -28,6 +29,8 @@ export default function ResourceForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
   const [form, setForm] = useState({
     name: '', type: 'LECTURE_HALL', capacity: 1, location: '', status: 'ACTIVE', description: '', equipmentText: ''
   });
@@ -71,6 +74,11 @@ export default function ResourceForm() {
     setError('');
     setSuccess('');
 
+    if (!isAdmin) {
+      setError('You do not have permission to perform this action. Only ADMIN users can edit resources.');
+      return;
+    }
+
     if (!isKnownSliitLocation(form.location)) {
       setError('Location must be a known SLIIT campus place (e.g. A Block, B Block, Library, Main Hall, New Building).');
       return;
@@ -101,10 +109,10 @@ export default function ResourceForm() {
       const apiMessage = err.response?.data?.message;
       const status = err.response?.status;
 
-      if (apiMessage) {
-        setError(apiMessage);
-      } else if (status === 403) {
+      if (status === 403) {
         setError('You do not have permission to perform this action. Only ADMIN users can edit resources.');
+      } else if (apiMessage) {
+        setError(apiMessage);
       } else if (status === 400) {
         setError('Invalid resource data. Please check all fields and try again.');
       } else {

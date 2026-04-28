@@ -44,7 +44,18 @@ export default function NotificationBell() {
       setDnd(isDndActive());
     }, 30000); // poll every 30s
     setDnd(isDndActive());
-    return () => clearInterval(interval);
+
+    const handleNotificationsUpdated = () => {
+      fetchCount();
+      fetchNotifications();
+    };
+
+    window.addEventListener('notifications-updated', handleNotificationsUpdated);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notifications-updated', handleNotificationsUpdated);
+    };
   }, []);
 
   useEffect(() => {

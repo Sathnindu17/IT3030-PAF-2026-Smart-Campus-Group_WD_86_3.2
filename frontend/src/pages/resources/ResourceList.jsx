@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { resourcesAPI } from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ResourceList() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ type: '', status: '' });
@@ -84,7 +87,9 @@ export default function ResourceList() {
         <h2>Resources & Facilities</h2>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => navigate('/app/resources/map')} className="btn btn-secondary">Campus Map</button>
-          <button onClick={() => navigate('/app/resources/new')} className="btn btn-primary">+ Add Resource</button>
+          {isAdmin && (
+            <button onClick={() => navigate('/app/resources/new')} className="btn btn-primary">+ Add Resource</button>
+          )}
         </div>
       </div>
 
@@ -125,10 +130,14 @@ export default function ResourceList() {
               <div className="resource-actions">
                 <button onClick={() => navigate(`/app/bookings/new?resourceId=${r.id}`)}
                   className="btn btn-sm btn-primary">Book</button>
-                <button onClick={() => navigate(`/app/resources/edit/${r.id}`)}
-                  className="btn btn-sm btn-primary">Edit</button>
-                <button onClick={() => handleDelete(r.id)}
-                  className="btn btn-sm btn-primary">Delete</button>
+                {isAdmin && (
+                  <button onClick={() => navigate(`/app/resources/edit/${r.id}`)}
+                    className="btn btn-sm btn-primary">Edit</button>
+                )}
+                {isAdmin && (
+                  <button onClick={() => handleDelete(r.id)}
+                    className="btn btn-sm btn-primary">Delete</button>
+                )}
               </div>
             </div>
           ))}

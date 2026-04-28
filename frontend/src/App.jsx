@@ -27,14 +27,14 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/app/resources" replace />} />
+          <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           <Route path="/app" element={<AppLayout />}>
-            <Route index element={<Navigate to="resources" replace />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="resources" element={<ResourceList />} />
             <Route path="resources/map" element={<CampusMapView />} />
 

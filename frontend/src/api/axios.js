@@ -65,6 +65,9 @@ export const authAPI = {
   login: (data) => api.post("/auth/login", data),
   googleLogin: (credential) => api.post("/auth/google", { credential }),
   getMe: () => api.get("/auth/me"),
+  deviceAlert: (data) => api.post("/auth/device-alert", data),
+  getNotificationPreferences: () => api.get("/auth/notification-preferences"),
+  updateNotificationPreferences: (data) => api.put("/auth/notification-preferences", data),
 };
 
 export const resourcesAPI = {

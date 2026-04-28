@@ -8,6 +8,7 @@ const CAMPUS_LAT_MIN = 6.9135;
 const CAMPUS_LAT_MAX = 6.9157;
 const CAMPUS_LNG_MIN = 79.9714;
 const CAMPUS_LNG_MAX = 79.9741;
+const CAMPUS_EDGE_PADDING = 0.00012;
 
 const CAMPUS_POLYGON = [
   [CAMPUS_LAT_MIN, CAMPUS_LNG_MIN],
@@ -54,13 +55,13 @@ function locationToPoint(location, id) {
     entry.keywords.some((keyword) => normalizedLocation.includes(keyword))
   );
   if (matched) {
-    return matched.point;
+    return clampToCampus(matched.point, CAMPUS_EDGE_PADDING);
   }
 
   const key = `${location || ''}-${id || ''}`;
   const lat = CAMPUS_CENTER[0] + hashToOffset(`lat-${key}`, 0.0032);
   const lng = CAMPUS_CENTER[1] + hashToOffset(`lng-${key}`, 0.0032);
-  return clampToCampus([lat, lng]);
+  return clampToCampus([lat, lng], CAMPUS_EDGE_PADDING);
 }
 
 function isInsideCampus(point) {
@@ -71,10 +72,15 @@ function isInsideCampus(point) {
     && point[1] <= CAMPUS_LNG_MAX;
 }
 
-function clampToCampus(point) {
+function clampToCampus(point, padding = 0) {
+  const safeLatMin = CAMPUS_LAT_MIN + padding;
+  const safeLatMax = CAMPUS_LAT_MAX - padding;
+  const safeLngMin = CAMPUS_LNG_MIN + padding;
+  const safeLngMax = CAMPUS_LNG_MAX - padding;
+
   return [
-    Math.min(Math.max(point[0], CAMPUS_LAT_MIN), CAMPUS_LAT_MAX),
-    Math.min(Math.max(point[1], CAMPUS_LNG_MIN), CAMPUS_LNG_MAX),
+    Math.min(Math.max(point[0], safeLatMin), safeLatMax),
+    Math.min(Math.max(point[1], safeLngMin), safeLngMax),
   ];
 }
 
@@ -238,13 +244,6 @@ export default function CampusMapView() {
                           <div>Capacity: {resource.capacity}</div>
                           <div>Location: {resource.location}</div>
                           <div>Status: {resource.status}</div>
-                          <button
-                            style={{ marginTop: 8 }}
-                            className="btn btn-sm btn-primary"
-                            onClick={() => navigate(`/app/bookings/new?resourceId=${resource.id}`)}
-                          >
-                            Book this
-                          </button>
                         </div>
                       </Popup>
                     </CircleMarker>

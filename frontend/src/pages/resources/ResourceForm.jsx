@@ -32,24 +32,34 @@ export default function ResourceForm() {
     name: '', type: 'LECTURE_HALL', capacity: 1, location: '', status: 'ACTIVE', description: '', equipmentText: ''
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(isEdit);
 
   useEffect(() => {
     if (isEdit) {
-      resourcesAPI.getById(id).then(res => {
-        const r = res.data.data;
-        setForm({
-          name: r.name,
-          type: r.type,
-          capacity: r.capacity,
-          location: r.location,
-          status: r.status,
-          description: r.description || '',
-          equipmentText: (r.equipment || []).join(', ')
+      setFormLoading(true);
+      resourcesAPI.getById(id)
+        .then(res => {
+          const r = res.data.data;
+          setForm({
+            name: r.name,
+            type: r.type,
+            capacity: r.capacity,
+            location: r.location,
+            status: r.status,
+            description: r.description || '',
+            equipmentText: (r.equipment || []).join(', ')
+          });
+          setFormLoading(false);
+        })
+        .catch(err => {
+          console.error('Failed to load resource:', err);
+          setError('Failed to load resource. Redirecting...');
+          setTimeout(() => navigate('/app/resources'), 1500);
         });
-      }).catch(() => navigate('/app/resources'));
     }
-  }, [id]);
+  }, [id, navigate]);
 
   const handleChange = (e) => {
     const value = e.target.name === 'capacity' ? parseInt(e.target.value) || 0 : e.target.value;
@@ -59,6 +69,7 @@ export default function ResourceForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (!isKnownSliitLocation(form.location)) {
       setError('Location must be a known SLIIT campus place (e.g. A Block, B Block, Library, Main Hall, New Building).');
@@ -77,10 +88,15 @@ export default function ResourceForm() {
 
       if (isEdit) {
         await resourcesAPI.update(id, payload);
+        setSuccess('Resource updated successfully! Redirecting...');
       } else {
         await resourcesAPI.create(payload);
+        setSuccess('Resource created successfully! Redirecting...');
       }
-      navigate('/app/resources');
+      
+      setTimeout(() => {
+        navigate('/app/resources');
+      }, 1500);
     } catch (err) {
       const apiMessage = err.response?.data?.message;
       const status = err.response?.status;
@@ -88,7 +104,7 @@ export default function ResourceForm() {
       if (apiMessage) {
         setError(apiMessage);
       } else if (status === 403) {
-        setError('You do not have permission to perform this action.');
+        setError('You do not have permission to perform this action. Only ADMIN users can edit resources.');
       } else if (status === 400) {
         setError('Invalid resource data. Please check all fields and try again.');
       } else {
@@ -105,7 +121,15 @@ export default function ResourceForm() {
       <div className="card" style={{ marginTop: 20 }}>
         <div className="card-body">
           {error && <div className="alert alert-error">{error}</div>}
-          <form onSubmit={handleSubmit}>
+          {success && <div className="alert alert-success">{success}</div>}
+          {formLoading && (
+            <div className="loading" style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div className="spinner"></div>
+              <p>Loading resource...</p>
+            </div>
+          )}
+          {!formLoading && (
+            <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Name</label>
               <input name="name" className="form-control" value={form.name} onChange={handleChange} required placeholder="e.g. Main Lecture Hall A" />
@@ -163,6 +187,7 @@ export default function ResourceForm() {
               <button type="button" onClick={() => navigate('/app/resources')} className="btn btn-secondary">Cancel</button>
             </div>
           </form>
+          )}
         </div>
       </div>
     </div>

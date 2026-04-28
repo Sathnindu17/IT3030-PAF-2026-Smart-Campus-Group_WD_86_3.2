@@ -27,35 +27,6 @@ public class ResourceController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Resource created", response));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<ResourceResponse>> update(@PathVariable String id,
-                                                                 @Valid @RequestBody ResourceRequest request) {
-        ResourceResponse response = resourceService.update(id, request);
-        return ResponseEntity.ok(ApiResponse.success("Resource updated", response));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String id) {
-        resourceService.delete(id);
-        return ResponseEntity.ok(ApiResponse.success("Resource deleted", null));
-    }
-
-    @GetMapping("/{id:^(?!(recommendations|map-availability)$).+}")
-    public ResponseEntity<ApiResponse<ResourceResponse>> getById(@PathVariable String id) {
-        ResourceResponse response = resourceService.getById(id);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<ResourceResponse>>> getAll(
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String location,
-            @RequestParam(required = false) Integer minCapacity) {
-        List<ResourceResponse> response = resourceService.getAll(type, status, location, minCapacity);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
     @GetMapping("/recommendations")
     public ResponseEntity<ApiResponse<List<ResourceRecommendationResponse>>> recommend(
             @RequestParam Integer attendees,
@@ -83,6 +54,35 @@ public class ResourceController {
             @RequestParam String startTime,
             @RequestParam String endTime) {
         List<ResourceMapAvailabilityResponse> response = resourceService.getMapAvailability(date, startTime, endTime);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<ResourceResponse>> getById(@PathVariable String id) {
+        ResourceResponse response = resourceService.getById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<ResourceResponse>> update(@PathVariable String id,
+                                                                 @Valid @RequestBody ResourceRequest request) {
+        ResourceResponse response = resourceService.update(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Resource updated", response));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String id) {
+        resourceService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Resource deleted", null));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<ResourceResponse>>> getAll(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) Integer minCapacity) {
+        List<ResourceResponse> response = resourceService.getAll(type, status, location, minCapacity);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

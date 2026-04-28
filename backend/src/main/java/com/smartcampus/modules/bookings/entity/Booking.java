@@ -21,7 +21,12 @@ public class Booking {
     @Id
     private String id;
 
+    // Existing resource from dropdown
     private String resourceId;
+
+    // Custom resource typed by user
+    private String resourceName;
+
     private String userId;
     private LocalDate date;
     private LocalTime startTime;

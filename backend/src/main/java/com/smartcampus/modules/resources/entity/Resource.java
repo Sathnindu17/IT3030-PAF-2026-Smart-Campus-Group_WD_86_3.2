@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -25,6 +26,7 @@ public class Resource {
     private String location;
     private ResourceStatus status;
     private String description;
+    private List<String> equipment;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -34,6 +36,6 @@ public class Resource {
     }
 
     public enum ResourceStatus {
-        ACTIVE, OUT_OF_SERVICE
+        ACTIVE, UNDER_RENOVATION, OUT_OF_SERVICE
     }
 }

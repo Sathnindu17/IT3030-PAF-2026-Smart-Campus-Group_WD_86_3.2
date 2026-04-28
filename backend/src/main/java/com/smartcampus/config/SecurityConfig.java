@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,49 +24,44 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(cors -> {})
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/hello").permitAll()
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
 
-                // Resource management - admin only for CUD
-                .requestMatchers(HttpMethod.POST, "/api/resources").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/resources/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/resources/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/resources/**").authenticated()
+                        // PUBLIC
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/hello").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Bookings
-                .requestMatchers(HttpMethod.POST, "/api/bookings").authenticated()
-                .requestMatchers("/api/bookings/my").authenticated()
-                .requestMatchers("/api/bookings/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/bookings/*/approve").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/bookings/*/reject").hasRole("ADMIN")
+                        // RESOURCES (READ = public, WRITE = admin)
+                        .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/resources").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/resources/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/resources/**").hasRole("ADMIN")
 
-                // Tickets
-                .requestMatchers(HttpMethod.POST, "/api/tickets").authenticated()
-                .requestMatchers("/api/tickets/my").authenticated()
-                .requestMatchers("/api/tickets/assigned").hasAnyRole("TECHNICIAN", "ADMIN")
-                .requestMatchers("/api/tickets/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/tickets/*/assign").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/tickets/*/status").hasAnyRole("ADMIN", "TECHNICIAN")
-                .requestMatchers(HttpMethod.PATCH, "/api/tickets/*/resolve").hasAnyRole("ADMIN", "TECHNICIAN")
+                        // BOOKINGS
+                        .requestMatchers("/api/bookings/**").authenticated()
 
-                // Comments
-                .requestMatchers("/api/comments/**").authenticated()
+                        // TICKETS
+                        .requestMatchers("/api/tickets/**").authenticated()
 
-                // Notifications
-                .requestMatchers("/api/notifications/**").authenticated()
+                        // COMMENTS
+                        .requestMatchers("/api/comments/**").authenticated()
 
-                // File upload
-                .requestMatchers("/api/upload/**").authenticated()
+                        // NOTIFICATIONS
+                        .requestMatchers("/api/notifications/**").authenticated()
 
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                        // USERS
+                        .requestMatchers(HttpMethod.GET, "/api/users/technicians").authenticated()
+
+                        // FILE UPLOAD
+                        .requestMatchers("/api/upload/**").authenticated()
+
+                        // EVERYTHING ELSE
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -139,6 +139,7 @@ export default function ResourceForm() {
                   <option value="LAB">Lab</option>
                   <option value="MEETING_ROOM">Meeting Room</option>
                   <option value="EXAM_HALL">Exam Hall</option>
+                  <option value="AUDITORIUM">Auditorium</option>
                 </select>
               </div>
               <div className="form-group">

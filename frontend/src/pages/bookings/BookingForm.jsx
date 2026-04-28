@@ -336,15 +336,17 @@ export default function BookingForm() {
                     {resourcesLoading ? "Loading resources..." : "Select a resource"}
                   </option>
 
-                  {resources.map((r) => {
-                    const id = r.id || r._id;
-                    return (
-                      <option key={id} value={id}>
-                        {r.name} ({String(r.type || "").replace(/_/g, " ")}) - {" "}
-                        {r.location}
-                      </option>
-                    );
-                  })}
+                  {resources
+                    .filter((r) => r.type !== "EQUIPMENT")
+                    .map((r) => {
+                      const id = r.id || r._id;
+                      return (
+                        <option key={id} value={id}>
+                          {r.name} ({String(r.type || "").replace(/_/g, " ")}) - {" "}
+                          {r.location}
+                        </option>
+                      );
+                    })}
 
                   <option value={CUSTOM_RESOURCE}>Other / Add my own resource</option>
                 </select>

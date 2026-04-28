@@ -35,7 +35,8 @@ const SLIIT_LOCATION_POINTS = [
   { ids: ['h block', 'block h', 'H Block'], point: [6.9150, 79.9716] },
   { ids: ['new building', 'new block', 'New Building'], point: [6.9137, 79.9730] },
   { ids: ['library', 'Library'], point: [6.9148, 79.9730] },
-  { ids: ['auditorium', 'main hall', 'Main Hall / Auditorium'], point: [6.9143, 79.9724] },
+  { ids: ['main building', 'Main Building', 'main hall', 'Main Hall'], point: [6.9143, 79.9724] },
+  { ids: ['auditorium', 'Auditorium'], point: [6.9141, 79.9729] },
   { ids: ['lab complex', 'labs', 'Lab Complex'], point: [6.9153, 79.9731] },
   { ids: ['car park', 'parking', 'Car Park / Parking'], point: [6.9139, 79.9721] },
 ];
@@ -228,7 +229,7 @@ export default function CampusMapView() {
           </div>
 
           <div style={{ fontSize: 13, color: '#64748b' }}>
-            Click map to set nearby center inside SLIIT campus boundary. Use SLIIT locations like A Block, B Block, New Building, Library, Main Hall for accurate pins. {nearbyCenter ? ' Showing only resources inside selected radius.' : ' Showing all resources.'}
+            Click map to set nearby center inside SLIIT campus boundary. Use SLIIT locations like New Building, Library, Main Building, Auditorium, Lab Complex for accurate pins. {nearbyCenter ? ' Showing only resources inside selected radius.' : ' Showing all resources.'}
           </div>
 
           {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}

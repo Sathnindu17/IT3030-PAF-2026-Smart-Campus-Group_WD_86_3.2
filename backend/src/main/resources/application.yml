@@ -13,6 +13,20 @@ spring:
       max-file-size: 5MB
       max-request-size: 15MB
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:wsathnidu@gmail.com}
+    password: ${MAIL_PASSWORD:fcpbnackhxiqlqwv}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        debug: true
+
 app:
   jwt:
     secret: ${JWT_SECRET:default-dev-secret-key-change-in-production-must-be-long-enough}
@@ -21,3 +35,8 @@ app:
     client-id: 611768844115-f6i3ckrf9m5o7gd3gtei9qpcierg81i5.apps.googleusercontent.com
   upload:
     dir: ${UPLOAD_DIR:uploads}
+
+logging:
+  level:
+    org.springframework.mail: DEBUG
+    com.smartcampus.common.service: DEBUG

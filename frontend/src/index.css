@@ -2310,6 +2310,12 @@ tr:hover {
   flex-wrap: wrap;
 }
 
+.landing-auth-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .landing-ghost-btn {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
@@ -2327,6 +2333,18 @@ tr:hover {
 
 .landing-solid-btn:hover {
   background: #edf4ff;
+}
+
+.landing-signup-btn {
+  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.25);
+}
+
+.landing-signup-btn:hover {
+  background: linear-gradient(135deg, #06b6d4, #1d4ed8);
+  transform: translateY(-1px);
 }
 
 .landing-hero-shell {

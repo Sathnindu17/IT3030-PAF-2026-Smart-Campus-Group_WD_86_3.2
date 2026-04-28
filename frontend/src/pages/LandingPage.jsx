@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useState, useEffect } from 'react';
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   // Slideshow images
@@ -140,10 +139,10 @@ export default function LandingPage() {
         </div>
 
         <div className="landing-nav-actions">
-          {!isAuthenticated && (
+          <div className="landing-auth-actions">
             <Link to="/login" className="btn btn-secondary landing-ghost-btn">Sign In</Link>
-          )}
-          <Link to="/app/dashboard" className="btn btn-primary landing-solid-btn">Go to Dashboard</Link>
+            <Link to="/register" className="btn btn-primary landing-signup-btn">Sign Up</Link>
+          </div>
         </div>
       </nav>
 
@@ -306,9 +305,6 @@ export default function LandingPage() {
             </p>
             <div className="landing-hero-actions">
               <Link to="/app/dashboard" className="btn btn-primary landing-solid-btn">Read More</Link>
-              {!isAuthenticated && (
-                <Link to="/login" className="btn btn-secondary landing-ghost-btn">Sign In</Link>
-              )}
             </div>
           </div>
 

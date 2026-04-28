@@ -39,7 +39,7 @@ public class ResourceService {
             "h block", "block h",
             "new building", "new block",
             "library",
-            "main hall", "auditorium",
+            "main building", "main hall", "auditorium",
             "lab complex", "labs",
             "car park", "parking"
     );
@@ -209,7 +209,7 @@ public class ResourceService {
         try {
             return Resource.ResourceType.valueOf(type.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Invalid type: " + type + ". Allowed: LECTURE_HALL, LAB, MEETING_ROOM, EQUIPMENT");
+            throw new BadRequestException("Invalid type: " + type + ". Allowed: LECTURE_HALL, LAB, MEETING_ROOM, EXAM_HALL, AUDITORIUM");
         }
     }
 
@@ -339,7 +339,7 @@ public class ResourceService {
 
         if (!known) {
             throw new BadRequestException(
-                    "Location must be a known SLIIT campus place (e.g. A Block, B Block, Library, Main Hall, New Building)."
+                    "Location must include a known SLIIT campus place (e.g. Main Building, Auditorium, Library, New Building, Lab Complex)."
             );
         }
 

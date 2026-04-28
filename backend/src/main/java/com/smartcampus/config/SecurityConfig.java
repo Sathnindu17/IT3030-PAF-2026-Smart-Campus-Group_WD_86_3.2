@@ -35,11 +35,11 @@ public class SecurityConfig {
                         .requestMatchers("/hello").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // RESOURCES (READ = public, WRITE = admin)
+                        // RESOURCES (PUBLIC)
                         .requestMatchers(HttpMethod.GET, "/api/resources/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/resources").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/resources/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/resources/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/resources").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/resources/**").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/api/resources/**").permitAll()
 
                         // BOOKINGS
                         .requestMatchers("/api/bookings/**").authenticated()

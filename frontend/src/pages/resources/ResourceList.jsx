@@ -95,7 +95,7 @@ export default function ResourceList() {
           <option value="LECTURE_HALL">Lecture Hall</option>
           <option value="LAB">Lab</option>
           <option value="MEETING_ROOM">Meeting Room</option>
-          <option value="EQUIPMENT">Equipment</option>
+          <option value="EXAM_HALL">Exam Hall</option>
         </select>
         <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}>
           <option value="">All Status</option>

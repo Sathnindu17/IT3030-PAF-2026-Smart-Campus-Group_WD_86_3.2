@@ -13,6 +13,7 @@ public class NotificationResponse {
     private String id;
     private String title;
     private String message;
+    private String type;
     private boolean isRead;
     private String createdAt;
 }

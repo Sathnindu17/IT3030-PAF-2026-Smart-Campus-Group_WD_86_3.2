@@ -18,6 +18,6 @@ app:
     secret: ${JWT_SECRET:default-dev-secret-key-change-in-production-must-be-long-enough}
     expiration-ms: 86400000
   google:
-    client-id: ${GOOGLE_CLIENT_ID:}
+    client-id: 611768844115-f6i3ckrf9m5o7gd3gtei9qpcierg81i5.apps.googleusercontent.com
   upload:
     dir: ${UPLOAD_DIR:uploads}

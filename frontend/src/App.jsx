@@ -10,11 +10,13 @@ import BookingForm from './pages/bookings/BookingForm';
 import MyBookings from './pages/bookings/MyBookings';
 import AdminBookings from './pages/bookings/AdminBookings';
 import CreateTicket from './pages/tickets/CreateTicket';
+import EditTicket from './pages/tickets/EditTicket';
 import MyTickets from './pages/tickets/MyTickets';
 import AdminTickets from './pages/tickets/AdminTickets';
 import TechnicianTickets from './pages/tickets/TechnicianTickets';
 import TicketDetail from './pages/tickets/TicketDetail';
 import NotificationsPage from './pages/NotificationsPage';
+import NotificationPreferences from './pages/NotificationPreferences';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
@@ -103,6 +105,14 @@ function App() {
               }
             />
             <Route
+              path="tickets/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <EditTicket />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="tickets/:id"
               element={
                 <ProtectedRoute>
@@ -132,6 +142,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <NotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="notifications/preferences"
+              element={
+                <ProtectedRoute>
+                  <NotificationPreferences />
                 </ProtectedRoute>
               }
             />

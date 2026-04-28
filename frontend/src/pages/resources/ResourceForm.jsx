@@ -3,24 +3,25 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { resourcesAPI } from '../../api/axios';
 
 const SLIIT_CAMPUS_LOCATIONS = [
-  { id: 'a-block', label: 'A Block' },
-  { id: 'b-block', label: 'B Block' },
-  { id: 'c-block', label: 'C Block' },
-  { id: 'd-block', label: 'D Block' },
-  { id: 'e-block', label: 'E Block' },
-  { id: 'f-block', label: 'F Block' },
-  { id: 'g-block', label: 'G Block' },
-  { id: 'h-block', label: 'H Block' },
   { id: 'new-building', label: 'New Building' },
   { id: 'library', label: 'Library' },
-  { id: 'main-hall', label: 'Main Hall / Auditorium' },
+  { id: 'main-building', label: 'Main Building' },
+  { id: 'auditorium', label: 'Auditorium' },
   { id: 'lab-complex', label: 'Lab Complex' },
   { id: 'car-park', label: 'Car Park / Parking' },
 ];
 
-const getLocationLabel = (id) => {
-  const location = SLIIT_CAMPUS_LOCATIONS.find(l => l.id === id);
-  return location ? location.label : id;
+const normalizeLocation = (value) => (value || '').trim().toLowerCase();
+
+const isPredefinedLocation = (value) => {
+  const normalized = normalizeLocation(value);
+  return SLIIT_CAMPUS_LOCATIONS.some((loc) => normalizeLocation(loc.label) === normalized);
+};
+
+const normalizeLegacyLocation = (value) => {
+  if (!value) return '';
+  if (normalizeLocation(value) === 'main hall') return 'Main Building';
+  return value;
 };
 
 export default function ResourceForm() {
@@ -34,6 +35,7 @@ export default function ResourceForm() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(isEdit);
+  const [locationMode, setLocationMode] = useState('select');
 
   useEffect(() => {
     if (isEdit) {
@@ -41,15 +43,17 @@ export default function ResourceForm() {
       resourcesAPI.getById(id)
         .then(res => {
           const r = res.data.data;
+          const normalizedLocation = normalizeLegacyLocation(r.location);
           setForm({
             name: r.name,
             type: r.type,
             capacity: r.capacity,
-            location: r.location,
+            location: normalizedLocation,
             status: r.status,
             description: r.description || '',
             equipmentText: (r.equipment || []).join(', ')
           });
+          setLocationMode(isPredefinedLocation(normalizedLocation) ? 'select' : 'custom');
           setFormLoading(false);
         })
         .catch(err => {
@@ -65,13 +69,22 @@ export default function ResourceForm() {
     setForm({ ...form, [e.target.name]: value });
   };
 
+  const handleLocationModeChange = (mode) => {
+    setLocationMode(mode);
+    setError('');
+
+    if (mode === 'select' && !isPredefinedLocation(form.location)) {
+      setForm((prev) => ({ ...prev, location: '' }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (!form.location) {
-      setError('Location is required. Please select a SLIIT campus location.');
+    if (!form.location.trim()) {
+      setError('Location is required. Please select from dropdown or type a campus location.');
       return;
     }
 
@@ -150,12 +163,51 @@ export default function ResourceForm() {
             <div className="form-row">
               <div className="form-group">
                 <label>Location (SLIIT Campus)</label>
-                <select name="location" className="form-control" value={form.location} onChange={handleChange} required>
-                  <option value="">-- Select a Campus Location --</option>
-                  {SLIIT_CAMPUS_LOCATIONS.map(loc => (
-                    <option key={loc.id} value={loc.label}>{loc.label}</option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="locationMode"
+                      checked={locationMode === 'select'}
+                      onChange={() => handleLocationModeChange('select')}
+                    />
+                    Choose from list
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="locationMode"
+                      checked={locationMode === 'custom'}
+                      onChange={() => handleLocationModeChange('custom')}
+                    />
+                    Type location
+                  </label>
+                </div>
+
+                {locationMode === 'select' ? (
+                  <select
+                    name="location"
+                    className="form-control"
+                    value={isPredefinedLocation(form.location) ? form.location : ''}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">-- Select a Campus Location --</option>
+                    {SLIIT_CAMPUS_LOCATIONS.map(loc => (
+                      <option key={loc.id} value={loc.label}>{loc.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    name="location"
+                    className="form-control"
+                    value={form.location}
+                    onChange={handleChange}
+                    placeholder="e.g. Main Building - Floor 5"
+                    required
+                  />
+                )}
               </div>
               <div className="form-group">
                 <label>Status</label>

@@ -32,7 +32,7 @@ public class Resource {
     private LocalDateTime updatedAt;
 
     public enum ResourceType {
-        LECTURE_HALL, LAB, MEETING_ROOM, EQUIPMENT
+        LECTURE_HALL, LAB, MEETING_ROOM, EXAM_HALL, AUDITORIUM
     }
 
     public enum ResourceStatus {

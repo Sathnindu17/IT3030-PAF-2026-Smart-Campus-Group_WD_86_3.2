@@ -7,6 +7,8 @@ import com.smartcampus.modules.auth.dto.AuthResponse;
 import com.smartcampus.modules.auth.dto.GoogleLoginRequest;
 import com.smartcampus.modules.auth.dto.LoginRequest;
 import com.smartcampus.modules.auth.dto.RegisterRequest;
+import com.smartcampus.modules.notifications.service.NotificationService;
+import com.smartcampus.modules.users.dto.NotificationPreferencesRequest;
 import com.smartcampus.modules.users.dto.UserResponse;
 import com.smartcampus.modules.users.entity.User;
 import com.smartcampus.modules.users.repository.UserRepository;
@@ -21,7 +23,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -31,9 +35,12 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final NotificationService notificationService;
 
     @Value("${app.google.client-id}")
     private String googleClientId;
+
+    private static final List<String> DEFAULT_ENABLED_TYPES = Arrays.asList("SECURITY", "BOOKING", "TICKET", "SYSTEM", "GENERAL");
 
     public AuthResponse register(RegisterRequest request) {
         // Validate passwords match
@@ -61,6 +68,12 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .authProvider(User.AuthProvider.LOCAL)
+                .notificationPreferences(User.NotificationPreferences.builder()
+                        .enabledTypes(DEFAULT_ENABLED_TYPES)
+                        .dndEnabled(false)
+                        .dndStart("22:00")
+                        .dndEnd("07:00")
+                        .build())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -95,19 +108,50 @@ public class AuthService {
 
     public AuthResponse googleLogin(GoogleLoginRequest request) {
         try {
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
-                    .setAudience(Collections.singletonList(googleClientId))
-                    .build();
+            String credential = request.getCredential();
+            String email = null;
+            String name = null;
 
-            GoogleIdToken idToken = verifier.verify(request.getCredential());
-            if (idToken == null) {
-                throw new UnauthorizedException("Invalid Google token");
+            // Try using the credential as an access token first (implicit flow)
+            try {
+                java.net.URL url = new java.net.URL("https://www.googleapis.com/oauth2/v3/userinfo");
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("Authorization", "Bearer " + credential);
+                conn.setRequestMethod("GET");
+
+                if (conn.getResponseCode() == 200) {
+                    java.io.InputStream is = conn.getInputStream();
+                    String body = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    is.close();
+
+                    // Simple JSON parsing for email and name
+                    email = extractJsonField(body, "email");
+                    name = extractJsonField(body, "name");
+                }
+            } catch (Exception e) {
+                // Fall through to ID token verification
             }
 
-            GoogleIdToken.Payload payload = idToken.getPayload();
-            String email = payload.getEmail();
-            String name = (String) payload.get("name");
+            // Fallback: try verifying as an ID token
+            if (email == null) {
+                GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                        new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                        .setAudience(Collections.singletonList(googleClientId))
+                        .build();
+
+                GoogleIdToken idToken = verifier.verify(credential);
+                if (idToken == null) {
+                    throw new UnauthorizedException("Invalid Google token");
+                }
+
+                GoogleIdToken.Payload payload = idToken.getPayload();
+                email = payload.getEmail();
+                name = (String) payload.get("name");
+            }
+
+            if (email == null) {
+                throw new UnauthorizedException("Could not retrieve email from Google");
+            }
 
             // Check if user exists
             Optional<User> existingUser = userRepository.findByEmail(email);
@@ -122,6 +166,12 @@ public class AuthService {
                         .email(email)
                         .role(User.Role.USER)
                         .authProvider(User.AuthProvider.GOOGLE)
+                        .notificationPreferences(User.NotificationPreferences.builder()
+                                .enabledTypes(DEFAULT_ENABLED_TYPES)
+                                .dndEnabled(false)
+                                .dndStart("22:00")
+                                .dndEnd("07:00")
+                                .build())
                         .createdAt(LocalDateTime.now())
                         .updatedAt(LocalDateTime.now())
                         .build();
@@ -139,6 +189,65 @@ public class AuthService {
         } catch (Exception e) {
             throw new BadRequestException("Google authentication failed: " + e.getMessage());
         }
+    }
+
+    private String extractJsonField(String json, String field) {
+        // Simple extraction: "field":"value" or "field": "value"
+        String pattern = "\"" + field + "\"\\s*:\\s*\"";
+        int idx = json.indexOf("\"" + field + "\"");
+        if (idx == -1) return null;
+        int colonIdx = json.indexOf(":", idx);
+        if (colonIdx == -1) return null;
+        int quoteStart = json.indexOf("\"", colonIdx + 1);
+        if (quoteStart == -1) return null;
+        int quoteEnd = json.indexOf("\"", quoteStart + 1);
+        if (quoteEnd == -1) return null;
+        return json.substring(quoteStart + 1, quoteEnd);
+    }
+
+    // ===== Trusted Device Alert =====
+
+    public void sendDeviceAlert(String userId, String deviceInfo) {
+        String title = "🔐 New Sign-in Detected";
+        String message = "New sign-in detected from " + deviceInfo + ". Not you? Secure your account immediately.";
+        notificationService.create(userId, title, message, "SECURITY");
+    }
+
+    // ===== Notification Preferences =====
+
+    public User.NotificationPreferences getNotificationPreferences(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        if (user.getNotificationPreferences() == null) {
+            // Return defaults
+            return User.NotificationPreferences.builder()
+                    .enabledTypes(DEFAULT_ENABLED_TYPES)
+                    .dndEnabled(false)
+                    .dndStart("22:00")
+                    .dndEnd("07:00")
+                    .build();
+        }
+        return user.getNotificationPreferences();
+    }
+
+    public User.NotificationPreferences updateNotificationPreferences(String userId,
+                                                                       NotificationPreferencesRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        User.NotificationPreferences prefs = User.NotificationPreferences.builder()
+                .enabledTypes(request.getEnabledTypes() != null ? request.getEnabledTypes() : DEFAULT_ENABLED_TYPES)
+                .dndEnabled(request.isDndEnabled())
+                .dndStart(request.getDndStart() != null ? request.getDndStart() : "22:00")
+                .dndEnd(request.getDndEnd() != null ? request.getDndEnd() : "07:00")
+                .build();
+
+        user.setNotificationPreferences(prefs);
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return prefs;
     }
 
     public UserResponse getCurrentUser(String userId) {

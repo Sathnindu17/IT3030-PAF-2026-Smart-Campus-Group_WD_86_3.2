@@ -1,9 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
 
 export default function AppLayout() {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -17,19 +17,22 @@ export default function AppLayout() {
     <div className="app-layout">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-header">
+        <Link to="/" className="sidebar-header sidebar-brand-link" aria-label="Go to home page">
           <h2>🏫 Smart Campus</h2>
           <p>Operations Hub</p>
-        </div>
+        </Link>
 
         <nav className="sidebar-nav">
           <div className="sidebar-section">
             <div className="sidebar-section-title">Main</div>
-            <NavLink to="/app" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/app/dashboard" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               <span className="icon">📊</span> Dashboard
             </NavLink>
-            <NavLink to="/app/resources" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <NavLink to="/app/resources" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               <span className="icon">🏢</span> Resources
+            </NavLink>
+            <NavLink to="/app/resources/map" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <span className="icon">🗺️</span> Campus Map
             </NavLink>
           </div>
 
@@ -76,19 +79,32 @@ export default function AppLayout() {
               </NavLink>
             </div>
           )}
+
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">Settings</div>
+            <NavLink to="/app/notifications/preferences" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <span className="icon">⚙️</span> Notification Settings
+            </NavLink>
+          </div>
         </nav>
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <div className="sidebar-user-avatar">{initial}</div>
             <div className="sidebar-user-info">
-              <div className="name">{user?.fullName}</div>
-              <div className="role">{user?.role}</div>
+              <div className="name">{user?.fullName || 'Guest'}</div>
+              <div className="role">{user?.role || 'VISITOR'}</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-secondary btn-sm" style={{ width: '100%', marginTop: 12 }}>
-            Logout
-          </button>
+          {isAuthenticated ? (
+            <button onClick={handleLogout} className="btn btn-secondary btn-sm" style={{ width: '100%', marginTop: 12 }}>
+              Logout
+            </button>
+          ) : (
+            <button onClick={() => navigate('/login')} className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 12 }}>
+              Login
+            </button>
+          )}
         </div>
       </aside>
 
@@ -99,7 +115,7 @@ export default function AppLayout() {
             <h1>Smart Campus Hub</h1>
           </div>
           <div className="topbar-actions">
-            <NotificationBell />
+            {isAuthenticated ? <NotificationBell /> : null}
           </div>
         </div>
         <div className="page-content">

@@ -58,9 +58,10 @@ public class TicketController {
 
     @PatchMapping("/{id}/assign")
     public ResponseEntity<ApiResponse<TicketResponse>> assignTechnician(
-            @PathVariable String id, @RequestBody Map<String, String> body) {
+            @PathVariable String id, @RequestBody Map<String, String> body, Authentication auth) {
         String technicianId = body.get("technicianId");
-        TicketResponse response = ticketService.assignTechnician(id, technicianId);
+        String assignedByUserId = (String) auth.getPrincipal();
+        TicketResponse response = ticketService.assignTechnician(id, technicianId, assignedByUserId);
         return ResponseEntity.ok(ApiResponse.success("Technician assigned", response));
     }
 
@@ -78,5 +79,21 @@ public class TicketController {
         String notes = body.get("resolutionNotes");
         TicketResponse response = ticketService.addResolutionNotes(id, notes);
         return ResponseEntity.ok(ApiResponse.success("Resolution notes added", response));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<TicketResponse>> updateTicket(
+            @PathVariable String id, @RequestBody Map<String, String> body, Authentication auth) {
+        String userId = (String) auth.getPrincipal();
+        TicketResponse response = ticketService.updateTicket(id, body, userId);
+        return ResponseEntity.ok(ApiResponse.success("Ticket updated", response));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<String>> deleteTicket(
+            @PathVariable String id, Authentication auth) {
+        String userId = (String) auth.getPrincipal();
+        ticketService.deleteTicket(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Ticket deleted"));
     }
 }

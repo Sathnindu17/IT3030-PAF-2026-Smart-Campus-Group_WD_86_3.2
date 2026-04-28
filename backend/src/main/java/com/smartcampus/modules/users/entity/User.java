@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -31,6 +32,8 @@ public class User {
 
     private AuthProvider authProvider;
 
+    private NotificationPreferences notificationPreferences;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -40,5 +43,16 @@ public class User {
 
     public enum AuthProvider {
         LOCAL, GOOGLE
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class NotificationPreferences {
+        private List<String> enabledTypes; // SECURITY, BOOKING, TICKET, SYSTEM, GENERAL
+        private boolean dndEnabled;
+        private String dndStart; // "22:00"
+        private String dndEnd;   // "07:00"
     }
 }

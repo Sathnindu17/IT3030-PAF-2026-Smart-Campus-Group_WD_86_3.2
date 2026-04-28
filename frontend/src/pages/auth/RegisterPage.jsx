@@ -36,7 +36,19 @@ export default function RegisterPage() {
       login(res.data.data.token, res.data.data.user);
       navigate('/app');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      const apiMessage = err.response?.data?.message;
+      const validationData = err.response?.data?.data;
+
+      if (apiMessage) {
+        setError(apiMessage);
+      } else if (validationData && typeof validationData === 'object') {
+        const firstValidationError = Object.values(validationData)[0];
+        setError(firstValidationError || 'Registration failed');
+      } else if (!err.response) {
+        setError('Cannot reach server. Please ensure backend is running on port 8088.');
+      } else {
+        setError('Registration failed');
+      }
     } finally {
       setLoading(false);
     }

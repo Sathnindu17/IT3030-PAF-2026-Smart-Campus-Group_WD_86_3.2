@@ -8,21 +8,31 @@ import lombok.Data;
 @Data
 public class BookingRequest {
 
-    @NotBlank(message = "Resource ID is required")
+    // Existing resource (dropdown)
     private String resourceId;
 
-    @NotNull(message = "Date is required")
+    // Custom resource (user input)
+    private String resourceName;
+
+    @NotBlank(message = "Date is required")
     private String date;
 
-    @NotNull(message = "Start time is required")
+    @NotBlank(message = "Start time is required")
     private String startTime;
 
-    @NotNull(message = "End time is required")
+    @NotBlank(message = "End time is required")
     private String endTime;
 
     @NotBlank(message = "Purpose is required")
     private String purpose;
 
+    @NotNull(message = "Expected attendees is required")
     @Min(value = 1, message = "Expected attendees must be at least 1")
-    private int expectedAttendees;
+    private Integer expectedAttendees;
+
+    // 🔥 IMPORTANT: Custom validation
+    public boolean isValidResource() {
+        return (resourceId != null && !resourceId.isBlank())
+                || (resourceName != null && !resourceName.isBlank());
+    }
 }

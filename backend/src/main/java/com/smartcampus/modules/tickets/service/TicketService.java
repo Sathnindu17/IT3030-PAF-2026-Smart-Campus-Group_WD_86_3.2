@@ -12,14 +12,17 @@ import com.smartcampus.modules.tickets.repository.TicketRepository;
 import com.smartcampus.modules.users.entity.User;
 import com.smartcampus.modules.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TicketService {
 
     private final TicketRepository ticketRepository;
@@ -49,6 +52,14 @@ public class TicketService {
                 .build();
 
         ticket = ticketRepository.save(ticket);
+
+        try {
+            notificationService.create(userId, "Ticket Created",
+                    "Your ticket '" + ticket.getTitle() + "' has been created successfully.");
+        } catch (Exception ex) {
+            log.warn("Ticket {} created but notification could not be saved for user {}", ticket.getId(), userId, ex);
+        }
+
         return toResponse(ticket);
     }
 
@@ -78,7 +89,7 @@ public class TicketService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
-    public TicketResponse assignTechnician(String ticketId, String technicianId) {
+    public TicketResponse assignTechnician(String ticketId, String technicianId, String assignedByUserId) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
@@ -98,6 +109,15 @@ public class TicketService {
         // Notify technician
         notificationService.create(technicianId, "Ticket Assigned",
                 "You have been assigned to ticket: " + ticket.getTitle());
+
+        if (assignedByUserId != null && !assignedByUserId.isBlank()) {
+            String technicianName = technician.getFullName() != null && !technician.getFullName().isBlank()
+                ? technician.getFullName()
+                : technician.getEmail();
+
+            notificationService.create(assignedByUserId, "Technician Assigned",
+                "You assigned " + technicianName + " to ticket: " + ticket.getTitle(), "TICKET");
+        }
 
         // Notify ticket creator
         notificationService.create(ticket.getCreatedBy(), "Ticket Update",
@@ -138,6 +158,66 @@ public class TicketService {
         return toResponse(ticket);
     }
 
+    public TicketResponse updateTicket(String ticketId, Map<String, String> updates, String userId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        // Only allow the ticket creator to update the ticket
+        if (!ticket.getCreatedBy().equals(userId)) {
+            throw new BadRequestException("You can only edit your own tickets");
+        }
+
+        // Only allow updates if ticket status is OPEN
+        if (ticket.getStatus() != Ticket.TicketStatus.OPEN) {
+            throw new BadRequestException("Only open tickets can be edited");
+        }
+
+        // Update allowed fields
+        if (updates.containsKey("title")) {
+            ticket.setTitle(updates.get("title"));
+        }
+        if (updates.containsKey("category")) {
+            ticket.setCategory(updates.get("category"));
+        }
+        if (updates.containsKey("description")) {
+            ticket.setDescription(updates.get("description"));
+        }
+        if (updates.containsKey("priority")) {
+            ticket.setPriority(parsePriority(updates.get("priority")));
+        }
+        if (updates.containsKey("preferredContact")) {
+            ticket.setPreferredContact(updates.get("preferredContact"));
+        }
+        if (updates.containsKey("location")) {
+            ticket.setLocation(updates.get("location"));
+        }
+        if (updates.containsKey("resourceId")) {
+            String resourceId = updates.get("resourceId");
+            ticket.setResourceId(resourceId.isEmpty() ? null : resourceId);
+        }
+
+        ticket.setUpdatedAt(LocalDateTime.now());
+        ticket = ticketRepository.save(ticket);
+        return toResponse(ticket);
+    }
+
+    public void deleteTicket(String ticketId, String userId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        // Only allow the ticket creator to delete the ticket
+        if (!ticket.getCreatedBy().equals(userId)) {
+            throw new BadRequestException("You can only delete your own tickets");
+        }
+
+        // Only allow deletion if ticket status is OPEN
+        if (ticket.getStatus() != Ticket.TicketStatus.OPEN) {
+            throw new BadRequestException("Only open tickets can be deleted");
+        }
+
+        ticketRepository.deleteById(ticketId);
+    }
+
     private Ticket.TicketPriority parsePriority(String priority) {
         try {
             return Ticket.TicketPriority.valueOf(priority.toUpperCase());
@@ -159,7 +239,11 @@ public class TicketService {
         String techName = null;
         if (ticket.getAssignedTechnicianId() != null) {
             techName = userRepository.findById(ticket.getAssignedTechnicianId())
-                    .map(User::getFullName).orElse(null);
+                    .map(user -> {
+                        String fullName = user.getFullName();
+                        return (fullName != null && !fullName.trim().isEmpty()) ? fullName : user.getEmail();
+                    })
+                    .orElse(null);
         }
 
         return TicketResponse.builder()

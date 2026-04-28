@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ticketsAPI } from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 import { calculateSLAStatus, formatSLATime, getSLAColor } from '../../utils/slaCalculator';
 import TicketRoleGreeting from '../../components/TicketRoleGreeting';
 import TicketCategoryPicker, { getTicketCategoryMeta, normalizeTicketCategory } from '../../components/TicketCategoryPicker';
 
 export default function TechnicianTickets() {
+  const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -23,8 +25,15 @@ export default function TechnicianTickets() {
   const fetchTickets = async () => {
     setLoading(true);
     try {
-      const res = await ticketsAPI.getAssignedTickets();
-      setTickets(res.data.data);
+      // Admins see all assigned tickets; Technicians see only their own
+      if (user?.role === 'ADMIN') {
+        const res = await ticketsAPI.getAllTickets();
+        const assignedOnly = res.data.data.filter((ticket) => ticket.assignedTechnicianId);
+        setTickets(assignedOnly);
+      } else {
+        const res = await ticketsAPI.getAssignedTickets();
+        setTickets(res.data.data);
+      }
     } catch (e) {} finally { setLoading(false); }
   };
 
@@ -122,15 +131,21 @@ export default function TechnicianTickets() {
 
   if (loading) return <div className="loading"><div className="spinner"></div> Loading assigned tickets...</div>;
 
+  const isAdmin = user?.role === 'ADMIN';
+  const pageTitle = isAdmin ? 'All Assigned Tickets' : 'My Assigned Tickets';
+  const pageDescription = isAdmin 
+    ? 'Monitor technician assignments and track ticket resolution progress.'
+    : 'Update status continuously so users and admins can track progress.';
+
   return (
     <div>
       <div className="ticket-page-header-row">
         <div>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 28 }}>👷</span>
-            My Assigned Tickets
+            {pageTitle}
           </h2>
-          <p className="ticket-subtext">Update status continuously so users and admins can track progress.</p>
+          <p className="ticket-subtext">{pageDescription}</p>
         </div>
       </div>
 
@@ -298,11 +313,17 @@ export default function TechnicianTickets() {
         }}>
           <div style={{ fontSize: 34, marginBottom: 10 }}>{hasActiveFilters ? '🔎' : '👷'}</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
-            {hasActiveFilters ? 'No assignments match your filters' : 'No tickets assigned to you'}
+            {hasActiveFilters 
+              ? 'No assignments match your filters' 
+              : isAdmin 
+              ? 'No assigned tickets yet' 
+              : 'No tickets assigned to you'}
           </div>
           <p style={{ margin: '0 auto 16px', maxWidth: 420, fontSize: 13, lineHeight: 1.55 }}>
             {hasActiveFilters
               ? 'Clear the filters to return to the full assignment list, or refresh if you expect new work.'
+              : isAdmin
+              ? 'Tickets assigned to technicians will appear here. Go to All Tickets to start assigning.'
               : 'Your queue is currently clear. New tickets will appear here as they are assigned.'}
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -353,6 +374,7 @@ export default function TechnicianTickets() {
                   <th>Status</th>
                   <th>SLA</th>
                   <th>Created By</th>
+                  {isAdmin && <th>Assigned Technician</th>}
                   <th>Actions</th>
                 </tr>
               </thead>

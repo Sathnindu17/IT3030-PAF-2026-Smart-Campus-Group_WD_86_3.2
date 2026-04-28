@@ -319,7 +319,7 @@ export default function TicketDetail() {
             { label: 'Created at', value: formatDate(ticket.createdAt) },
             { label: 'Location', value: ticket.location || ticket.resourceName || '—' },
             { label: 'Preferred contact', value: ticket.preferredContact || '—' },
-            ticket.assignedTechnicianName && { label: 'Assigned technician', value: ticket.assignedTechnicianName },
+            ticket.assignedTechnicianId && { label: 'Assigned technician', value: ticket.assignedTechnicianName || `Technician ${ticket.assignedTechnicianId.substring(0, 8)}...` },
             ticket.resourceName && { label: 'Related resource', value: ticket.resourceName },
           ].filter(Boolean).map(item => (
             <div key={item.label}>

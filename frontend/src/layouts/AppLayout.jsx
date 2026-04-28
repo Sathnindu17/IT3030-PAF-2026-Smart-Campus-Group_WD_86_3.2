@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
 
@@ -17,10 +17,10 @@ export default function AppLayout() {
     <div className="app-layout">
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-header">
+        <Link to="/" className="sidebar-header sidebar-brand-link" aria-label="Go to home page">
           <h2>🏫 Smart Campus</h2>
           <p>Operations Hub</p>
-        </div>
+        </Link>
 
         <nav className="sidebar-nav">
           <div className="sidebar-section">

@@ -89,7 +89,7 @@ public class TicketService {
                 .map(this::toResponse).collect(Collectors.toList());
     }
 
-    public TicketResponse assignTechnician(String ticketId, String technicianId) {
+    public TicketResponse assignTechnician(String ticketId, String technicianId, String assignedByUserId) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
@@ -109,6 +109,15 @@ public class TicketService {
         // Notify technician
         notificationService.create(technicianId, "Ticket Assigned",
                 "You have been assigned to ticket: " + ticket.getTitle());
+
+        if (assignedByUserId != null && !assignedByUserId.isBlank()) {
+            String technicianName = technician.getFullName() != null && !technician.getFullName().isBlank()
+                ? technician.getFullName()
+                : technician.getEmail();
+
+            notificationService.create(assignedByUserId, "Technician Assigned",
+                "You assigned " + technicianName + " to ticket: " + ticket.getTitle(), "TICKET");
+        }
 
         // Notify ticket creator
         notificationService.create(ticket.getCreatedBy(), "Ticket Update",
@@ -230,7 +239,11 @@ public class TicketService {
         String techName = null;
         if (ticket.getAssignedTechnicianId() != null) {
             techName = userRepository.findById(ticket.getAssignedTechnicianId())
-                    .map(User::getFullName).orElse(null);
+                    .map(user -> {
+                        String fullName = user.getFullName();
+                        return (fullName != null && !fullName.trim().isEmpty()) ? fullName : user.getEmail();
+                    })
+                    .orElse(null);
         }
 
         return TicketResponse.builder()

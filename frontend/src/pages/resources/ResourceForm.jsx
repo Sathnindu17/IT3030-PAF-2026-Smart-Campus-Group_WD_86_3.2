@@ -1,36 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { resourcesAPI } from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
 
-const KNOWN_SLIIT_LOCATION_KEYWORDS = [
-  'a block', 'block a',
-  'b block', 'block b',
-  'c block', 'block c',
-  'd block', 'block d',
-  'e block', 'block e',
-  'f block', 'block f',
-  'g block', 'block g',
-  'h block', 'block h',
-  'new building', 'new block',
-  'library',
-  'main hall', 'auditorium',
-  'lab complex', 'labs',
-  'car park', 'parking',
+const SLIIT_CAMPUS_LOCATIONS = [
+  { id: 'a-block', label: 'A Block' },
+  { id: 'b-block', label: 'B Block' },
+  { id: 'c-block', label: 'C Block' },
+  { id: 'd-block', label: 'D Block' },
+  { id: 'e-block', label: 'E Block' },
+  { id: 'f-block', label: 'F Block' },
+  { id: 'g-block', label: 'G Block' },
+  { id: 'h-block', label: 'H Block' },
+  { id: 'new-building', label: 'New Building' },
+  { id: 'library', label: 'Library' },
+  { id: 'main-hall', label: 'Main Hall / Auditorium' },
+  { id: 'lab-complex', label: 'Lab Complex' },
+  { id: 'car-park', label: 'Car Park / Parking' },
 ];
 
-const isKnownSliitLocation = (location) => {
-  const normalized = (location || '').toLowerCase().trim();
-  if (!normalized) return false;
-  return KNOWN_SLIIT_LOCATION_KEYWORDS.some((keyword) => normalized.includes(keyword));
+const getLocationLabel = (id) => {
+  const location = SLIIT_CAMPUS_LOCATIONS.find(l => l.id === id);
+  return location ? location.label : id;
 };
 
 export default function ResourceForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
-  const isAdmin = hasRole('ADMIN');
   const [form, setForm] = useState({
     name: '', type: 'LECTURE_HALL', capacity: 1, location: '', status: 'ACTIVE', description: '', equipmentText: ''
   });
@@ -74,13 +70,8 @@ export default function ResourceForm() {
     setError('');
     setSuccess('');
 
-    if (!isAdmin) {
-      setError('You do not have permission to perform this action. Only ADMIN users can edit resources.');
-      return;
-    }
-
-    if (!isKnownSliitLocation(form.location)) {
-      setError('Location must be a known SLIIT campus place (e.g. A Block, B Block, Library, Main Hall, New Building).');
+    if (!form.location) {
+      setError('Location is required. Please select a SLIIT campus location.');
       return;
     }
 
@@ -109,9 +100,7 @@ export default function ResourceForm() {
       const apiMessage = err.response?.data?.message;
       const status = err.response?.status;
 
-      if (status === 403) {
-        setError('You do not have permission to perform this action. Only ADMIN users can edit resources.');
-      } else if (apiMessage) {
+      if (apiMessage) {
         setError(apiMessage);
       } else if (status === 400) {
         setError('Invalid resource data. Please check all fields and try again.');
@@ -159,11 +148,13 @@ export default function ResourceForm() {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Location</label>
-                <input name="location" className="form-control" value={form.location} onChange={handleChange} required placeholder="e.g. SLIIT A Block, Floor 2" />
-                {form.location && !isKnownSliitLocation(form.location) && (
-                  <div className="form-error">Use a known SLIIT location such as A Block, B Block, Library, Main Hall, New Building.</div>
-                )}
+                <label>Location (SLIIT Campus)</label>
+                <select name="location" className="form-control" value={form.location} onChange={handleChange} required>
+                  <option value="">-- Select a Campus Location --</option>
+                  {SLIIT_CAMPUS_LOCATIONS.map(loc => (
+                    <option key={loc.id} value={loc.label}>{loc.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
                 <label>Status</label>

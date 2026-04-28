@@ -10,6 +10,7 @@ const CAMPUS_LNG_MIN = 79.9714;
 const CAMPUS_LNG_MAX = 79.9741;
 const CAMPUS_EDGE_PADDING = 0.00012;
 
+// Campus boundary polygon
 const CAMPUS_POLYGON = [
   [CAMPUS_LAT_MIN, CAMPUS_LNG_MIN],
   [CAMPUS_LAT_MIN, CAMPUS_LNG_MAX],
@@ -22,20 +23,21 @@ const CAMPUS_MAX_BOUNDS = [
   [CAMPUS_LAT_MAX, CAMPUS_LNG_MAX],
 ];
 
+// Predefined SLIIT campus locations with exact coordinates
 const SLIIT_LOCATION_POINTS = [
-  { keywords: ['a block', 'block a'], point: [6.9149, 79.9722] },
-  { keywords: ['b block', 'block b'], point: [6.9152, 79.9728] },
-  { keywords: ['c block', 'block c'], point: [6.9151, 79.9735] },
-  { keywords: ['d block', 'block d'], point: [6.9146, 79.9738] },
-  { keywords: ['e block', 'block e'], point: [6.9142, 79.9733] },
-  { keywords: ['f block', 'block f'], point: [6.9141, 79.9726] },
-  { keywords: ['g block', 'block g'], point: [6.9145, 79.9720] },
-  { keywords: ['h block', 'block h'], point: [6.9150, 79.9716] },
-  { keywords: ['new building', 'new block'], point: [6.9137, 79.9730] },
-  { keywords: ['library'], point: [6.9148, 79.9730] },
-  { keywords: ['auditorium', 'main hall'], point: [6.9143, 79.9724] },
-  { keywords: ['lab complex', 'labs'], point: [6.9153, 79.9731] },
-  { keywords: ['car park', 'parking'], point: [6.9139, 79.9721] },
+  { ids: ['a block', 'block a', 'A Block'], point: [6.9149, 79.9722] },
+  { ids: ['b block', 'block b', 'B Block'], point: [6.9152, 79.9728] },
+  { ids: ['c block', 'block c', 'C Block'], point: [6.9151, 79.9735] },
+  { ids: ['d block', 'block d', 'D Block'], point: [6.9146, 79.9738] },
+  { ids: ['e block', 'block e', 'E Block'], point: [6.9142, 79.9733] },
+  { ids: ['f block', 'block f', 'F Block'], point: [6.9141, 79.9726] },
+  { ids: ['g block', 'block g', 'G Block'], point: [6.9145, 79.9720] },
+  { ids: ['h block', 'block h', 'H Block'], point: [6.9150, 79.9716] },
+  { ids: ['new building', 'new block', 'New Building'], point: [6.9137, 79.9730] },
+  { ids: ['library', 'Library'], point: [6.9148, 79.9730] },
+  { ids: ['auditorium', 'main hall', 'Main Hall / Auditorium'], point: [6.9143, 79.9724] },
+  { ids: ['lab complex', 'labs', 'Lab Complex'], point: [6.9153, 79.9731] },
+  { ids: ['car park', 'parking', 'Car Park / Parking'], point: [6.9139, 79.9721] },
 ];
 
 function hashToOffset(value, spread) {
@@ -50,18 +52,49 @@ function hashToOffset(value, spread) {
 }
 
 function locationToPoint(location, id) {
-  const normalizedLocation = (location || '').toLowerCase();
-  const matched = SLIIT_LOCATION_POINTS.find((entry) =>
-    entry.keywords.some((keyword) => normalizedLocation.includes(keyword))
-  );
-  if (matched) {
-    return clampToCampus(matched.point, CAMPUS_EDGE_PADDING);
+  if (!location) {
+    return clampToCampus(CAMPUS_CENTER, 0);
   }
 
-  const key = `${location || ''}-${id || ''}`;
-  const lat = CAMPUS_CENTER[0] + hashToOffset(`lat-${key}`, 0.0032);
-  const lng = CAMPUS_CENTER[1] + hashToOffset(`lng-${key}`, 0.0032);
-  return clampToCampus([lat, lng], CAMPUS_EDGE_PADDING);
+  const normalizedLocation = location.toLowerCase().trim();
+  
+  // Try exact match first
+  let matched = SLIIT_LOCATION_POINTS.find((entry) =>
+    entry.ids.some((loc) => normalizedLocation.includes(loc.toLowerCase()))
+  );
+  
+  if (matched) {
+    return clampToCampus(matched.point, 0);
+  }
+
+  // Try fuzzy matching for common variations
+  if (normalizedLocation.includes('block') && normalizedLocation.length <= 10) {
+    const blockChar = normalizedLocation.match(/[a-h]/i)?.[0]?.toLowerCase();
+    if (blockChar) {
+      matched = SLIIT_LOCATION_POINTS.find((entry) =>
+        entry.ids.some((loc) => loc.toLowerCase().includes(blockChar))
+      );
+      if (matched) {
+        return clampToCampus(matched.point, 0);
+      }
+    }
+  }
+
+  // Try keyword matching for other locations
+  const keywords = ['library', 'auditorium', 'main', 'hall', 'lab', 'labs', 'car', 'park', 'parking', 'new', 'building'];
+  for (const keyword of keywords) {
+    if (normalizedLocation.includes(keyword)) {
+      matched = SLIIT_LOCATION_POINTS.find((entry) =>
+        entry.ids.some((loc) => loc.toLowerCase().includes(keyword))
+      );
+      if (matched) {
+        return clampToCampus(matched.point, 0);
+      }
+    }
+  }
+
+  // Default to campus center - always safe
+  return clampToCampus(CAMPUS_CENTER, 0);
 }
 
 function isInsideCampus(point) {
@@ -139,10 +172,15 @@ export default function CampusMapView() {
   }, [filters.type, filters.status]);
 
   const mapResources = useMemo(() => {
-    return resources.map((resource) => ({
-      ...resource,
-      point: locationToPoint(resource.location, resource.id),
-    }));
+    return resources.map((resource) => {
+      const point = locationToPoint(resource.location, resource.id);
+      // Final safety clamp to ensure no point goes outside bounds
+      const clampedPoint = clampToCampus(point, 0);
+      return {
+        ...resource,
+        point: clampedPoint,
+      };
+    });
   }, [resources]);
 
   const visibleResources = useMemo(() => {

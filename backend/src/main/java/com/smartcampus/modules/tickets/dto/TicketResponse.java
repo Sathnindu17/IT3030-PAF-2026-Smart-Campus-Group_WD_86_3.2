@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
-
+//used to transfer ticket data from backend to frontend.
 @Data
 @Builder
 @NoArgsConstructor

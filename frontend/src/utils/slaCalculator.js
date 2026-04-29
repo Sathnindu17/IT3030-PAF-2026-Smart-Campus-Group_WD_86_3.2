@@ -31,6 +31,7 @@ const SLA_CONFIG = {
  * @param {Object} ticket - Ticket object with createdAt, status, priority, updatedAt
  * @returns {Object} SLA status object
  */
+//Real-time calculation of remaining time
 export const calculateSLAStatus = (ticket) => {
   if (!ticket || !ticket.createdAt || !ticket.priority) {
     return null;

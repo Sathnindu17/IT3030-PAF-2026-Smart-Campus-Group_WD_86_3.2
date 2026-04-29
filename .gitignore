@@ -16,9 +16,9 @@ frontend/.env
 # IDE
 .idea/
 *.iml
-.vscode/
 .DS_Store
 
 # Environment
-.env
 *.log
+config.bat
+node_modules

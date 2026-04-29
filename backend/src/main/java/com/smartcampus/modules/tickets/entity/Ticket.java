@@ -9,7 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
+//Ticket entity represents the ticket data stored in MongoDB, including details, status, priority, and timestamps
 @Data
 @Builder
 @NoArgsConstructor

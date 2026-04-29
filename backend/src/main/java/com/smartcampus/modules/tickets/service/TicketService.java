@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+//TicketService is the business logic layer that handles all ticket operations.
 @Service
 @RequiredArgsConstructor
 @Slf4j

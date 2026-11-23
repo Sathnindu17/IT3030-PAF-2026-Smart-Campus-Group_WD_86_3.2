@@ -4,10 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node init && vite",
-    "dev": "node init && vite",
-    "build": "node init && vite build",
-    "preview": "vite preview"
+    
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",

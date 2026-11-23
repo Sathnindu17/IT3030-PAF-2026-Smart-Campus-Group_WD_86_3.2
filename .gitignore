@@ -20,5 +20,6 @@ frontend/.env
 
 # Environment
 *.log
+
 config.bat
 node_modules
